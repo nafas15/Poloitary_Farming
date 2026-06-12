@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { useFarm, FeedType } from '../context/FarmContext';
+import { useFarm } from '../context/FarmContext';
+import type { FeedType } from '../context/FarmContext';
 import { Modal } from '../components/Modal';
 
 export const FeedMgmt: React.FC = () => {

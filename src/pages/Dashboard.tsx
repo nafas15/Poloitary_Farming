@@ -13,7 +13,6 @@ export const Dashboard: React.FC = () => {
   const totalFeedStock = (['Starter', 'Grower', 'Finisher', 'Layer Mash'] as FeedType[])
     .reduce((sum, type) => sum + getFeedStock(type), 0);
 
-  const todayStr = new Date().toISOString().split('T')[0];
   const latestEggCollection = eggCollections[0]; 
   const todayEggs = latestEggCollection ? latestEggCollection.netQty : 0;
 
@@ -30,8 +29,7 @@ export const Dashboard: React.FC = () => {
     }).format(amount);
   };
 
-  // Recent Sales
-  const recentSales = sales.slice(0, 5);
+
 
   // ==========================================
   // SVG CHART 1: EGG COLLECTION TREND (Line)

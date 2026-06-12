@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useFarm, FeedType } from '../context/FarmContext';
+import { useFarm } from '../context/FarmContext';
 
 type ReportPeriod = 'daily' | 'weekly' | 'monthly' | 'custom';
 

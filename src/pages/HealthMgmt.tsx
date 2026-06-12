@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useFarm, VaccineSchedule, MedicalRecord, VaccineStatus } from '../context/FarmContext';
+import { useFarm } from '../context/FarmContext';
 import { Modal } from '../components/Modal';
 
 export const HealthMgmt: React.FC = () => {
@@ -206,8 +206,8 @@ export const HealthMgmt: React.FC = () => {
               type="text"
               className="form-control"
               placeholder="e.g. Fowl Pox, Newcastle Lasota"
-              value={vacName}
-              onChange={e => setVacName(e.target.value)}
+              value={vaccineName}
+              onChange={e => setVaccineName(e.target.value)}
               required
             />
           </div>
@@ -217,8 +217,8 @@ export const HealthMgmt: React.FC = () => {
               <label className="form-label">Target Batch</label>
               <select
                 className="form-control"
-                value={vacBatchId}
-                onChange={e => setVacBatchId(e.target.value)}
+                value={vaccineBatchId}
+                onChange={e => setVaccineBatchId(e.target.value)}
                 required
               >
                 <option value="">-- Select Active Batch --</option>
@@ -234,8 +234,8 @@ export const HealthMgmt: React.FC = () => {
               <input
                 type="date"
                 className="form-control"
-                value={vacDate}
-                onChange={e => setVacDate(e.target.value)}
+                value={vaccineDate}
+                onChange={e => setVaccineDate(e.target.value)}
                 required
               />
             </div>
@@ -262,8 +262,8 @@ export const HealthMgmt: React.FC = () => {
               <input
                 type="date"
                 className="form-control"
-                value={medDate}
-                onChange={e => setMedDate(e.target.value)}
+                value={medicalDate}
+                onChange={e => setMedicalDate(e.target.value)}
                 required
               />
             </div>
@@ -271,8 +271,8 @@ export const HealthMgmt: React.FC = () => {
               <label className="form-label">Target Batch</label>
               <select
                 className="form-control"
-                value={medBatchId}
-                onChange={e => setMedBatchId(e.target.value)}
+                value={medicalBatchId}
+                onChange={e => setMedicalBatchId(e.target.value)}
                 required
               >
                 <option value="">-- Select Active Batch --</option>
@@ -291,8 +291,8 @@ export const HealthMgmt: React.FC = () => {
               type="text"
               className="form-control"
               placeholder="e.g. Coccidiosis, Coryza, Bird Flu symptoms"
-              value={medDisease}
-              onChange={e => setMedDisease(e.target.value)}
+              value={disease}
+              onChange={e => setDisease(e.target.value)}
               required
             />
           </div>
@@ -304,8 +304,8 @@ export const HealthMgmt: React.FC = () => {
                 type="text"
                 className="form-control"
                 placeholder="e.g. Amprolium, Tylosin"
-                value={medName}
-                onChange={e => setMedName(e.target.value)}
+                value={medicine}
+                onChange={e => setMedicine(e.target.value)}
                 required
               />
             </div>
@@ -316,8 +316,8 @@ export const HealthMgmt: React.FC = () => {
                 step="0.01"
                 min="0"
                 className="form-control"
-                value={medCost}
-                onChange={e => setMedCost(Number(e.target.value))}
+                value={medicalCost}
+                onChange={e => setMedicalCost(Number(e.target.value))}
                 required
               />
             </div>
@@ -329,8 +329,8 @@ export const HealthMgmt: React.FC = () => {
               className="form-control"
               placeholder="e.g. 5g per gallon of drinking water for 3 days"
               rows={2}
-              value={medDosage}
-              onChange={e => setMedDosage(e.target.value)}
+              value={dosage}
+              onChange={e => setDosage(e.target.value)}
               required
               style={{ resize: 'vertical' }}
             ></textarea>

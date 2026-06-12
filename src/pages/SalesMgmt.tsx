@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { useFarm, Sale, SaleType } from '../context/FarmContext';
+import { useFarm } from '../context/FarmContext';
+import type { Sale } from '../context/FarmContext';
 import { Modal } from '../components/Modal';
 
 export const SalesMgmt: React.FC = () => {

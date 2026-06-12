@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useFarm, EggCollection } from '../context/FarmContext';
+import { useFarm } from '../context/FarmContext';
 import { Modal } from '../components/Modal';
 
 export const EggProduction: React.FC = () => {
@@ -31,7 +31,7 @@ export const EggProduction: React.FC = () => {
   // Performance calculations
   const totalCollected = eggCollections.reduce((sum, c) => sum + c.collectedQty, 0);
   const totalDamaged = eggCollections.reduce((sum, c) => sum + c.damagedQty, 0);
-  const totalUsable = eggCollections.reduce((sum, c) => sum + c.netQty, 0);
+
   const damageRate = totalCollected > 0 ? ((totalDamaged / totalCollected) * 100).toFixed(2) : '0.00';
   const averageYield = eggCollections.length > 0 ? Math.round(totalCollected / eggCollections.length) : 0;
 

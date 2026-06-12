@@ -4,7 +4,7 @@ import type { BirdType } from '../context/FarmContext';
 import { Modal } from '../components/Modal';
 
 export const BirdMgmt: React.FC = () => {
-  const { batches, addBatch, logMortality, sellBatch } = useFarm();
+  const { batches, addBatch, logMortality } = useFarm();
   
   // Tab Filter
   const [filter, setFilter] = useState<'Active' | 'Sold'>('Active');
@@ -12,7 +12,6 @@ export const BirdMgmt: React.FC = () => {
   // Modals Open State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isMortalityModalOpen, setIsMortalityModalOpen] = useState(false);
-  const [isSellModalOpen, setIsSellModalOpen] = useState(false);
   const [selectedBatchId, setSelectedBatchId] = useState<string>('');
 
   // Form Fields - Add Batch
@@ -27,11 +26,6 @@ export const BirdMgmt: React.FC = () => {
   const [mortalityReason, setMortalityReason] = useState('');
   const [mortalityDate, setMortalityDate] = useState(new Date().toISOString().split('T')[0]);
 
-  // Form Fields - Sell Batch
-  const [sellQuantity, setSellQuantity] = useState<number>(100);
-  const [sellPrice, setSellPrice] = useState<number>(4.50);
-  const [customerName, setCustomerName] = useState('');
-  const [customerContact, setCustomerContact] = useState('');
 
   // Utility to calculate bird age in weeks
   const calculateAgeWeeks = (arrivalDateStr: string): number => {

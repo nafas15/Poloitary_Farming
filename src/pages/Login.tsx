@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { useFarm, UserRole } from '../context/FarmContext';
+import { useFarm } from '../context/FarmContext';
+import type { UserRole } from '../context/FarmContext';
 
 export const Login: React.FC = () => {
   const { login } = useFarm();
