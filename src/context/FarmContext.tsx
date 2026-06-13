@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '../lib/supabaseClient';
 
 // ==========================================
 // TYPES AND INTERFACES
@@ -134,252 +135,193 @@ interface FarmContextType {
 }
 
 // ==========================================
-// INITIAL MOCK DATA
-// ==========================================
-
-const INITIAL_BATCHES: BirdBatch[] = [
-  {
-    id: 'B-101',
-    type: 'Layer',
-    arrivalDate: '2026-05-15',
-    initialQuantity: 1200,
-    currentQuantity: 1192,
-    purchasePrice: 1.50,
-    status: 'Active',
-    mortalityLogs: [
-      { id: 'm-1', date: '2026-05-20', quantity: 3, reason: 'Stress from transport' },
-      { id: 'm-2', date: '2026-05-28', quantity: 5, reason: 'Heat exhaustion' }
-    ]
-  },
-  {
-    id: 'B-102',
-    type: 'Broiler',
-    arrivalDate: '2026-05-28',
-    initialQuantity: 1500,
-    currentQuantity: 1488,
-    purchasePrice: 1.10,
-    status: 'Active',
-    mortalityLogs: [
-      { id: 'm-3', date: '2026-06-02', quantity: 8, reason: 'Coccidiosis outbreak' },
-      { id: 'm-4', date: '2026-06-08', quantity: 4, reason: 'Smothering' }
-    ]
-  },
-  {
-    id: 'B-99',
-    type: 'Broiler',
-    arrivalDate: '2026-04-10',
-    initialQuantity: 1000,
-    currentQuantity: 0,
-    purchasePrice: 1.05,
-    status: 'Sold',
-    mortalityLogs: [
-      { id: 'm-5', date: '2026-04-15', quantity: 10, reason: 'Temperature fluctuation' }
-    ]
-  }
-];
-
-const INITIAL_FEED_PURCHASES: FeedPurchase[] = [
-  { id: 'fp-1', date: '2026-05-10', feedType: 'Layer Mash', quantityKg: 1500, cost: 675, vendor: 'AgriFeed Co.' },
-  { id: 'fp-2', date: '2026-05-25', feedType: 'Starter', quantityKg: 800, cost: 420, vendor: 'Poultry Nutrition Ltd' },
-  { id: 'fp-3', date: '2026-06-01', feedType: 'Grower', quantityKg: 1000, cost: 480, vendor: 'Poultry Nutrition Ltd' }
-];
-
-const INITIAL_FEED_CONSUMPTION: FeedConsumption[] = [
-  // Layer mash consumption (B-101)
-  { id: 'fc-1', date: '2026-06-05', feedType: 'Layer Mash', batchId: 'B-101', quantityKg: 60 },
-  { id: 'fc-2', date: '2026-06-06', feedType: 'Layer Mash', batchId: 'B-101', quantityKg: 62 },
-  { id: 'fc-3', date: '2026-06-07', feedType: 'Layer Mash', batchId: 'B-101', quantityKg: 59 },
-  { id: 'fc-4', date: '2026-06-08', feedType: 'Layer Mash', batchId: 'B-101', quantityKg: 61 },
-  { id: 'fc-5', date: '2026-06-09', feedType: 'Layer Mash', batchId: 'B-101', quantityKg: 65 },
-  { id: 'fc-6', date: '2026-06-10', feedType: 'Layer Mash', batchId: 'B-101', quantityKg: 63 },
-  { id: 'fc-7', date: '2026-06-11', feedType: 'Layer Mash', batchId: 'B-101', quantityKg: 64 },
-
-  // Starter/Grower consumption (B-102)
-  { id: 'fc-8', date: '2026-06-08', feedType: 'Starter', batchId: 'B-102', quantityKg: 75 },
-  { id: 'fc-9', date: '2026-06-09', feedType: 'Starter', batchId: 'B-102', quantityKg: 78 },
-  { id: 'fc-10', date: '2026-06-10', feedType: 'Grower', batchId: 'B-102', quantityKg: 82 },
-  { id: 'fc-11', date: '2026-06-11', feedType: 'Grower', batchId: 'B-102', quantityKg: 85 }
-];
-
-const INITIAL_VACCINES: VaccineSchedule[] = [
-  { id: 'v-1', vaccineName: 'Newcastle Disease', batchId: 'B-101', scheduledDate: '2026-05-22', status: 'Completed' },
-  { id: 'v-2', vaccineName: 'Gumboro Disease', batchId: 'B-101', scheduledDate: '2026-06-05', status: 'Completed' },
-  { id: 'v-3', vaccineName: 'Fowl Pox', batchId: 'B-101', scheduledDate: '2026-06-25', status: 'Pending' },
-  { id: 'v-4', vaccineName: 'Newcastle Disease', batchId: 'B-102', scheduledDate: '2026-06-04', status: 'Completed' },
-  { id: 'v-5', vaccineName: 'Infectious Bronchitis', batchId: 'B-102', scheduledDate: '2026-06-18', status: 'Pending' }
-];
-
-const INITIAL_MEDICAL_RECORDS: MedicalRecord[] = [
-  { id: 'mr-1', date: '2026-06-02', batchId: 'B-102', disease: 'Coccidiosis', medicine: 'Amprolium', dosage: '9.6% solution in water for 5 days', cost: 120 }
-];
-
-const INITIAL_EGGS: EggCollection[] = [
-  { date: '2026-06-02', collectedQty: 820, damagedQty: 12, netQty: 808 },
-  { date: '2026-06-03', collectedQty: 840, damagedQty: 10, netQty: 830 },
-  { date: '2026-06-04', collectedQty: 850, damagedQty: 15, netQty: 835 },
-  { date: '2026-06-05', collectedQty: 810, damagedQty: 8, netQty: 802 },
-  { date: '2026-06-06', collectedQty: 830, damagedQty: 14, netQty: 816 },
-  { date: '2026-06-07', collectedQty: 860, damagedQty: 9, netQty: 851 },
-  { date: '2026-06-08', collectedQty: 875, damagedQty: 11, netQty: 864 },
-  { date: '2026-06-09', collectedQty: 890, damagedQty: 7, netQty: 883 },
-  { date: '2026-06-10', collectedQty: 910, damagedQty: 10, netQty: 900 },
-  { date: '2026-06-11', collectedQty: 925, damagedQty: 8, netQty: 917 }
-];
-
-const INITIAL_SALES: Sale[] = [
-  {
-    id: 's-1',
-    invoiceId: 'INV-2026-0001',
-    type: 'Bird',
-    date: '2026-05-24',
-    customerName: 'Premium Meat Market',
-    customerContact: '+1 (555) 019-2834',
-    quantity: 990, // B-99 batch (1000 - 10 mortality)
-    unitPrice: 4.50, // Per bird
-    totalAmount: 4455,
-    batchId: 'B-99',
-    details: 'Full batch B-99 Broilers sold. Avg weight ~2.1kg.'
-  },
-  {
-    id: 's-2',
-    invoiceId: 'INV-2026-0002',
-    type: 'Egg',
-    date: '2026-06-06',
-    customerName: 'Daily Delights Bakery',
-    customerContact: '+1 (555) 014-9988',
-    quantity: 50, // Crates
-    unitPrice: 5.50, // Per crate
-    totalAmount: 275,
-    details: '1500 clean layer eggs (50 crates of 30).'
-  },
-  {
-    id: 's-3',
-    invoiceId: 'INV-2026-0003',
-    type: 'Egg',
-    date: '2026-06-10',
-    customerName: 'Supermart Distributors',
-    customerContact: '+1 (555) 012-4411',
-    quantity: 120, // Crates
-    unitPrice: 5.30,
-    totalAmount: 636,
-    details: '3600 fresh eggs (120 crates of 30).'
-  }
-];
-
-const INITIAL_EXPENSES: Expense[] = [
-  // Auto-generated from feed purchases
-  { id: 'exp-1', category: 'Feed', date: '2026-05-10', description: 'Feed Purchase: Layer Mash (1500 kg) from AgriFeed Co.', amount: 675, isAutoGenerated: true, referenceId: 'fp-1' },
-  { id: 'exp-2', category: 'Feed', date: '2026-05-25', description: 'Feed Purchase: Starter (800 kg) from Poultry Nutrition Ltd', amount: 420, isAutoGenerated: true, referenceId: 'fp-2' },
-  { id: 'exp-3', category: 'Feed', date: '2026-06-01', description: 'Feed Purchase: Grower (1000 kg) from Poultry Nutrition Ltd', amount: 480, isAutoGenerated: true, referenceId: 'fp-3' },
-  
-  // Auto-generated from health purchases
-  { id: 'exp-4', category: 'Medicine', date: '2026-06-02', description: 'Medical Record Treatment: Coccidiosis in B-102 (Amprolium)', amount: 120, isAutoGenerated: true, referenceId: 'mr-1' },
-  
-  // Manual expenses
-  { id: 'exp-5', category: 'Electricity', date: '2026-05-30', description: 'Farm shed ventilation and lighting electricity bill - May', amount: 245, isAutoGenerated: false },
-  { id: 'exp-6', category: 'Labor', date: '2026-05-31', description: 'Part-time farm hands wage payout', amount: 900, isAutoGenerated: false },
-  { id: 'exp-7', category: 'Water', date: '2026-05-31', description: 'Water supply utility charges - May', amount: 95, isAutoGenerated: false },
-  { id: 'exp-8', category: 'Other', date: '2026-06-05', description: 'Repairs for automated drinker lines in Shed 2', amount: 130, isAutoGenerated: false }
-];
-
-// ==========================================
 // CONTEXT CREATION & PROVIDER
 // ==========================================
 
 const FarmContext = createContext<FarmContextType | undefined>(undefined);
 
 export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Session User
+  // Session User (Kept in LocalStorage for dev auth simplicity)
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     const saved = localStorage.getItem('poultry_user');
     return saved ? JSON.parse(saved) : null;
   });
 
   // Core Farm States
-  const [batches, setBatches] = useState<BirdBatch[]>(() => {
-    const saved = localStorage.getItem('poultry_batches');
-    return saved ? JSON.parse(saved) : INITIAL_BATCHES;
-  });
+  const [batches, setBatches] = useState<BirdBatch[]>([]);
+  const [feedPurchases, setFeedPurchases] = useState<FeedPurchase[]>([]);
+  const [feedConsumption, setFeedConsumption] = useState<FeedConsumption[]>([]);
+  const [vaccines, setVaccines] = useState<VaccineSchedule[]>([]);
+  const [medicalRecords, setMedicalRecords] = useState<MedicalRecord[]>([]);
+  const [eggCollections, setEggCollections] = useState<EggCollection[]>([]);
+  const [sales, setSales] = useState<Sale[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
 
-  const [feedPurchases, setFeedPurchases] = useState<FeedPurchase[]>(() => {
-    const saved = localStorage.getItem('poultry_feed_purchases');
-    return saved ? JSON.parse(saved) : INITIAL_FEED_PURCHASES;
-  });
+  // ----------------------------------------------------
+  // FETCH ALL DATA FROM SUPABASE
+  // ----------------------------------------------------
+  const fetchAllData = async () => {
+    try {
+      const [
+        { data: batchesData, error: batchesErr },
+        { data: mortalityData, error: mortalityErr },
+        { data: feedPurchasesData, error: fpErr },
+        { data: feedConsumptionData, error: fcErr },
+        { data: vaccinesData, error: vErr },
+        { data: medicalRecordsData, error: mrErr },
+        { data: eggCollectionsData, error: ecErr },
+        { data: salesData, error: sErr },
+        { data: expensesData, error: expErr }
+      ] = await Promise.all([
+        supabase.from('batches').select('*'),
+        supabase.from('mortality_logs').select('*'),
+        supabase.from('feed_purchases').select('*'),
+        supabase.from('feed_consumptions').select('*'),
+        supabase.from('vaccine_schedules').select('*'),
+        supabase.from('medical_records').select('*'),
+        supabase.from('egg_collections').select('*'),
+        supabase.from('sales').select('*'),
+        supabase.from('expenses').select('*')
+      ]);
 
-  const [feedConsumption, setFeedConsumption] = useState<FeedConsumption[]>(() => {
-    const saved = localStorage.getItem('poultry_feed_consumption');
-    return saved ? JSON.parse(saved) : INITIAL_FEED_CONSUMPTION;
-  });
+      if (batchesErr || mortalityErr || fpErr || fcErr || vErr || mrErr || ecErr || sErr || expErr) {
+        console.error('Error fetching data from Supabase:', {
+          batchesErr, mortalityErr, fpErr, fcErr, vErr, mrErr, ecErr, sErr, expErr
+        });
+        return;
+      }
 
-  const [vaccines, setVaccines] = useState<VaccineSchedule[]>(() => {
-    const saved = localStorage.getItem('poultry_vaccines');
-    return saved ? JSON.parse(saved) : INITIAL_VACCINES;
-  });
+      // Map Batches and their Mortality Logs
+      const formattedBatches = (batchesData || []).map((b: any) => ({
+        id: b.id,
+        type: b.type as BirdType,
+        arrivalDate: b.arrival_date,
+        initialQuantity: b.initial_quantity,
+        currentQuantity: b.current_quantity,
+        purchasePrice: Number(b.purchase_price),
+        status: b.status as BatchStatus,
+        mortalityLogs: (mortalityData || [])
+          .filter((m: any) => m.batch_id === b.id)
+          .map((m: any) => ({
+            id: m.id,
+            date: m.date,
+            quantity: m.quantity,
+            reason: m.reason
+          }))
+      }));
+      setBatches(formattedBatches);
 
-  const [medicalRecords, setMedicalRecords] = useState<MedicalRecord[]>(() => {
-    const saved = localStorage.getItem('poultry_medical_records');
-    return saved ? JSON.parse(saved) : INITIAL_MEDICAL_RECORDS;
-  });
+      // Map Feed Purchases
+      setFeedPurchases((feedPurchasesData || []).map((p: any) => ({
+        id: p.id,
+        date: p.date,
+        feedType: p.feed_type as FeedType,
+        quantityKg: Number(p.quantity_kg),
+        cost: Number(p.cost),
+        vendor: p.vendor
+      })));
 
-  const [eggCollections, setEggCollections] = useState<EggCollection[]>(() => {
-    const saved = localStorage.getItem('poultry_egg_collections');
-    return saved ? JSON.parse(saved) : INITIAL_EGGS;
-  });
+      // Map Feed Consumptions
+      setFeedConsumption((feedConsumptionData || []).map((c: any) => ({
+        id: c.id,
+        date: c.date,
+        feedType: c.feed_type as FeedType,
+        batchId: c.batch_id,
+        quantityKg: Number(c.quantity_kg)
+      })));
 
-  const [sales, setSales] = useState<Sale[]>(() => {
-    const saved = localStorage.getItem('poultry_sales');
-    return saved ? JSON.parse(saved) : INITIAL_SALES;
-  });
+      // Map Vaccine Schedules
+      setVaccines((vaccinesData || []).map((v: any) => ({
+        id: v.id,
+        vaccineName: v.vaccine_name,
+        batchId: v.batch_id,
+        scheduledDate: v.scheduled_date,
+        status: v.status as VaccineStatus
+      })));
 
-  const [expenses, setExpenses] = useState<Expense[]>(() => {
-    const saved = localStorage.getItem('poultry_expenses');
-    return saved ? JSON.parse(saved) : INITIAL_EXPENSES;
-  });
+      // Map Medical Records
+      setMedicalRecords((medicalRecordsData || []).map((m: any) => ({
+        id: m.id,
+        date: m.date,
+        batchId: m.batch_id,
+        disease: m.disease,
+        medicine: m.medicine,
+        dosage: m.dosage,
+        cost: Number(m.cost)
+      })));
 
-  // Save changes to LocalStorage
+      // Map Egg Collections
+      setEggCollections((eggCollectionsData || []).map((e: any) => ({
+        date: e.date,
+        collectedQty: e.collected_qty,
+        damagedQty: e.damaged_qty,
+        netQty: e.net_qty
+      })));
+
+      // Map Sales
+      setSales((salesData || []).map((s: any) => ({
+        id: s.id,
+        invoiceId: s.invoice_id,
+        type: s.type as SaleType,
+        date: s.date,
+        customerName: s.customer_name,
+        customerContact: s.customer_contact,
+        quantity: Number(s.quantity),
+        unitPrice: Number(s.unit_price),
+        totalAmount: Number(s.total_amount),
+        batchId: s.batch_id || undefined,
+        details: s.details || undefined
+      })));
+
+      // Map Expenses
+      setExpenses((expensesData || []).map((ex: any) => ({
+        id: ex.id,
+        category: ex.category as ExpenseCategory,
+        date: ex.date,
+        description: ex.description,
+        amount: Number(ex.amount),
+        isAutoGenerated: ex.is_auto_generated,
+        referenceId: ex.reference_id || undefined
+      })));
+
+    } catch (err) {
+      console.error('Unexpected error loading farm data:', err);
+    }
+  };
+
+  // Sync session user
   useEffect(() => {
     localStorage.setItem('poultry_user', currentUser ? JSON.stringify(currentUser) : '');
   }, [currentUser]);
 
+  // Load initial data and subscribe to realtime updates
   useEffect(() => {
-    localStorage.setItem('poultry_batches', JSON.stringify(batches));
-  }, [batches]);
+    fetchAllData();
 
-  useEffect(() => {
-    localStorage.setItem('poultry_feed_purchases', JSON.stringify(feedPurchases));
-  }, [feedPurchases]);
+    // Subscribe to schema changes across all public tables
+    const channel = supabase
+      .channel('realtime-farm-updates')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public' },
+        () => {
+          // Trigger a clean refetch when any database write occurs
+          fetchAllData();
+        }
+      )
+      .subscribe();
 
-  useEffect(() => {
-    localStorage.setItem('poultry_feed_consumption', JSON.stringify(feedConsumption));
-  }, [feedConsumption]);
-
-  useEffect(() => {
-    localStorage.setItem('poultry_vaccines', JSON.stringify(vaccines));
-  }, [vaccines]);
-
-  useEffect(() => {
-    localStorage.setItem('poultry_medical_records', JSON.stringify(medicalRecords));
-  }, [medicalRecords]);
-
-  useEffect(() => {
-    localStorage.setItem('poultry_egg_collections', JSON.stringify(eggCollections));
-  }, [eggCollections]);
-
-  useEffect(() => {
-    localStorage.setItem('poultry_sales', JSON.stringify(sales));
-  }, [sales]);
-
-  useEffect(() => {
-    localStorage.setItem('poultry_expenses', JSON.stringify(expenses));
-  }, [expenses]);
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   // ==========================================
   // UTILITIES & STATE MUTATORS
   // ==========================================
 
-  // Authentication
+  // Authentication (Local Session storage)
   const login = (username: string, role: UserRole): boolean => {
-    // Basic password checking - accepts 'admin' / 'employee' for simplicity
     if (
       (role === 'Admin' && username.toLowerCase() === 'admin') ||
       (role === 'Employee' && username.toLowerCase() === 'employee')
@@ -395,112 +337,153 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // 1. Bird Management
-  const addBatch = (batch: Omit<BirdBatch, 'currentQuantity' | 'mortalityLogs' | 'status'>) => {
-    const newBatch: BirdBatch = {
-      ...batch,
-      currentQuantity: batch.initialQuantity,
-      status: 'Active',
-      mortalityLogs: []
+  const addBatch = async (batch: Omit<BirdBatch, 'currentQuantity' | 'mortalityLogs' | 'status'>) => {
+    const newBatch = {
+      id: batch.id,
+      type: batch.type,
+      arrival_date: batch.arrivalDate,
+      initial_quantity: batch.initialQuantity,
+      current_quantity: batch.initialQuantity,
+      purchase_price: batch.purchasePrice,
+      status: 'Active'
     };
-    setBatches(prev => [newBatch, ...prev]);
 
-    // Track original bird cost as immediate expense
     const cost = batch.initialQuantity * batch.purchasePrice;
-    const newExpense: Expense = {
+    const newExpense = {
       id: `exp-${Date.now()}`,
       category: 'Other',
       date: batch.arrivalDate,
       description: `Bird Batch Purchase: ${batch.type} - ${batch.initialQuantity} birds (ID: ${batch.id})`,
       amount: cost,
-      isAutoGenerated: true,
-      referenceId: batch.id
+      is_auto_generated: true,
+      reference_id: batch.id
     };
-    setExpenses(prev => [newExpense, ...prev]);
+
+    // Insert to DB (realtime updates state reactively)
+    await Promise.all([
+      supabase.from('batches').insert(newBatch),
+      supabase.from('expenses').insert(newExpense)
+    ]);
   };
 
-  const sellBatch = (
+  const sellBatch = async (
     batchId: string,
     quantity: number,
     pricePerBird: number,
     customerName: string,
     customerContact: string
   ) => {
-    setBatches(prev =>
-      prev.map(b => {
-        if (b.id === batchId) {
-          const newCurrentQty = Math.max(0, b.currentQuantity - quantity);
-          return {
-            ...b,
-            currentQuantity: newCurrentQty,
-            status: newCurrentQty === 0 ? 'Sold' : 'Active'
-          };
-        }
-        return b;
-      })
-    );
+    try {
+      const { data: batch } = await supabase
+        .from('batches')
+        .select('current_quantity')
+        .eq('id', batchId)
+        .single();
 
-    // Record sale
-    const saleId = `s-${Date.now()}`;
-    const invoiceNum = `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
-    const newSale: Sale = {
-      id: saleId,
-      invoiceId: invoiceNum,
-      type: 'Bird',
-      date: new Date().toISOString().split('T')[0],
-      customerName,
-      customerContact,
-      quantity,
-      unitPrice: pricePerBird,
-      totalAmount: quantity * pricePerBird,
-      batchId,
-      details: `Sold ${quantity} birds from Batch ${batchId}`
-    };
-    setSales(prev => [newSale, ...prev]);
+      if (!batch) return;
+
+      const newCurrentQty = Math.max(0, batch.current_quantity - quantity);
+      const newStatus = newCurrentQty === 0 ? 'Sold' : 'Active';
+
+      const saleId = `s-${Date.now()}`;
+      const invoiceNum = `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      const newSale = {
+        id: saleId,
+        invoice_id: invoiceNum,
+        type: 'Bird',
+        date: new Date().toISOString().split('T')[0],
+        customer_name: customerName,
+        customer_contact: customerContact,
+        quantity,
+        unit_price: pricePerBird,
+        total_amount: quantity * pricePerBird,
+        batch_id: batchId,
+        details: `Sold ${quantity} birds from Batch ${batchId}`
+      };
+
+      await Promise.all([
+        supabase
+          .from('batches')
+          .update({ current_quantity: newCurrentQty, status: newStatus })
+          .eq('id', batchId),
+        supabase.from('sales').insert(newSale)
+      ]);
+    } catch (err) {
+      console.error('Failed to sell batch:', err);
+    }
   };
 
-  const logMortality = (batchId: string, quantity: number, reason: string, date: string) => {
-    setBatches(prev =>
-      prev.map(b => {
-        if (b.id === batchId) {
-          const actualQty = Math.min(b.currentQuantity, quantity);
-          const newLogs = [
-            ...b.mortalityLogs,
-            { id: `m-${Date.now()}`, date, quantity: actualQty, reason }
-          ];
-          return {
-            ...b,
-            currentQuantity: b.currentQuantity - actualQty,
-            mortalityLogs: newLogs
-          };
-        }
-        return b;
-      })
-    );
+  const logMortality = async (batchId: string, quantity: number, reason: string, date: string) => {
+    try {
+      const { data: batch } = await supabase
+        .from('batches')
+        .select('current_quantity')
+        .eq('id', batchId)
+        .single();
+
+      if (!batch) return;
+
+      const actualQty = Math.min(batch.current_quantity, quantity);
+      const newCurrentQty = batch.current_quantity - actualQty;
+
+      const newLog = {
+        id: `m-${Date.now()}`,
+        batch_id: batchId,
+        date,
+        quantity: actualQty,
+        reason
+      };
+
+      await Promise.all([
+        supabase
+          .from('batches')
+          .update({ current_quantity: newCurrentQty })
+          .eq('id', batchId),
+        supabase.from('mortality_logs').insert(newLog)
+      ]);
+    } catch (err) {
+      console.error('Failed to log mortality:', err);
+    }
   };
 
   // 2. Feed Management
-  const addFeedPurchase = (purchase: Omit<FeedPurchase, 'id'>) => {
+  const addFeedPurchase = async (purchase: Omit<FeedPurchase, 'id'>) => {
     const id = `fp-${Date.now()}`;
-    const newPurchase: FeedPurchase = { id, ...purchase };
-    setFeedPurchases(prev => [newPurchase, ...prev]);
+    const newPurchase = {
+      id,
+      date: purchase.date,
+      feed_type: purchase.feedType,
+      quantity_kg: purchase.quantityKg,
+      cost: purchase.cost,
+      vendor: purchase.vendor
+    };
 
-    // Auto add to expenses
-    const newExpense: Expense = {
+    const newExpense = {
       id: `exp-${Date.now()}`,
       category: 'Feed',
       date: purchase.date,
       description: `Feed Purchase: ${purchase.feedType} (${purchase.quantityKg} kg) from ${purchase.vendor}`,
       amount: purchase.cost,
-      isAutoGenerated: true,
-      referenceId: id
+      is_auto_generated: true,
+      reference_id: id
     };
-    setExpenses(prev => [newExpense, ...prev]);
+
+    await Promise.all([
+      supabase.from('feed_purchases').insert(newPurchase),
+      supabase.from('expenses').insert(newExpense)
+    ]);
   };
 
-  const addFeedConsumption = (consumption: Omit<FeedConsumption, 'id'>) => {
+  const addFeedConsumption = async (consumption: Omit<FeedConsumption, 'id'>) => {
     const id = `fc-${Date.now()}`;
-    const newConsumption: FeedConsumption = { id, ...consumption };
-    setFeedConsumption(prev => [newConsumption, ...prev]);
+    const newConsumption = {
+      id,
+      date: consumption.date,
+      feed_type: consumption.feedType,
+      batch_id: consumption.batchId,
+      quantity_kg: consumption.quantityKg
+    };
+    await supabase.from('feed_consumptions').insert(newConsumption);
   };
 
   const getFeedStock = (type: FeedType): number => {
@@ -516,93 +499,117 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // 3. Health & Vaccination
-  const addVaccineSchedule = (schedule: Omit<VaccineSchedule, 'id' | 'status'>) => {
-    const newSchedule: VaccineSchedule = {
+  const addVaccineSchedule = async (schedule: Omit<VaccineSchedule, 'id' | 'status'>) => {
+    const newSchedule = {
       id: `v-${Date.now()}`,
-      ...schedule,
+      vaccine_name: schedule.vaccineName,
+      batch_id: schedule.batchId,
+      scheduled_date: schedule.scheduledDate,
       status: 'Pending'
     };
-    setVaccines(prev => [newSchedule, ...prev]);
+    await supabase.from('vaccine_schedules').insert(newSchedule);
   };
 
-  const updateVaccineStatus = (id: string, status: VaccineStatus) => {
-    setVaccines(prev =>
-      prev.map(v => (v.id === id ? { ...v, status } : v))
-    );
+  const updateVaccineStatus = async (id: string, status: VaccineStatus) => {
+    await supabase
+      .from('vaccine_schedules')
+      .update({ status })
+      .eq('id', id);
   };
 
-  const addMedicalRecord = (record: Omit<MedicalRecord, 'id'>) => {
+  const addMedicalRecord = async (record: Omit<MedicalRecord, 'id'>) => {
     const id = `mr-${Date.now()}`;
-    const newRecord: MedicalRecord = { id, ...record };
-    setMedicalRecords(prev => [newRecord, ...prev]);
+    const newRecord = {
+      id,
+      date: record.date,
+      batch_id: record.batchId,
+      disease: record.disease,
+      medicine: record.medicine,
+      dosage: record.dosage,
+      cost: record.cost
+    };
 
-    // Auto-generate medical expense
+    const operations: any[] = [supabase.from('medical_records').insert(newRecord)];
+
     if (record.cost > 0) {
-      const newExpense: Expense = {
+      const newExpense = {
         id: `exp-${Date.now()}`,
         category: 'Medicine',
         date: record.date,
         description: `Medical Treatment: Batch ${record.batchId} treated for ${record.disease} (${record.medicine})`,
         amount: record.cost,
-        isAutoGenerated: true,
-        referenceId: id
+        is_auto_generated: true,
+        reference_id: id
       };
-      setExpenses(prev => [newExpense, ...prev]);
+      operations.push(supabase.from('expenses').insert(newExpense));
     }
+
+    await Promise.all(operations);
   };
 
   // 4. Egg Production
-  const addEggCollection = (collection: EggCollection) => {
-    // Check if entry for date already exists, if so overwrite, else prepend
-    setEggCollections(prev => {
-      const filtered = prev.filter(c => c.date !== collection.date);
-      return [collection, ...filtered].sort((a, b) => b.date.localeCompare(a.date));
-    });
+  const addEggCollection = async (collection: EggCollection) => {
+    const newCollection = {
+      date: collection.date,
+      collected_qty: collection.collectedQty,
+      damaged_qty: collection.damagedQty,
+      net_qty: collection.netQty
+    };
+    await supabase.from('egg_collections').upsert(newCollection);
   };
 
-  const addEggSale = (sale: Omit<Sale, 'id' | 'invoiceId' | 'type' | 'batchId'>) => {
+  const addEggSale = async (sale: Omit<Sale, 'id' | 'invoiceId' | 'type' | 'batchId'>) => {
     const saleId = `s-${Date.now()}`;
     const invoiceNum = `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
-    const newSale: Sale = {
+    const newSale = {
       id: saleId,
-      invoiceId: invoiceNum,
+      invoice_id: invoiceNum,
       type: 'Egg',
       date: sale.date,
-      customerName: sale.customerName,
-      customerContact: sale.customerContact,
+      customer_name: sale.customerName,
+      customer_contact: sale.customerContact,
       quantity: sale.quantity,
-      unitPrice: sale.unitPrice,
-      totalAmount: sale.totalAmount,
+      unit_price: sale.unitPrice,
+      total_amount: sale.totalAmount,
       details: sale.details
     };
-    setSales(prev => [newSale, ...prev]);
+    await supabase.from('sales').insert(newSale);
   };
 
   // 5. Expense Management
-  const addExpense = (expense: Omit<Expense, 'id' | 'isAutoGenerated'>) => {
-    const newExpense: Expense = {
+  const addExpense = async (expense: Omit<Expense, 'id' | 'isAutoGenerated'>) => {
+    const newExpense = {
       id: `exp-${Date.now()}`,
-      ...expense,
-      isAutoGenerated: false
+      category: expense.category,
+      date: expense.date,
+      description: expense.description,
+      amount: expense.amount,
+      is_auto_generated: false
     };
-    setExpenses(prev => [newExpense, ...prev]);
+    await supabase.from('expenses').insert(newExpense);
   };
 
-  const deleteExpense = (id: string) => {
-    // Warning: Normally auto-generated expenses should be kept or deleted along with references,
-    // but we allow deletion or standard control from context.
-    const expense = expenses.find(e => e.id === id);
-    if (!expense) return;
+  const deleteExpense = async (id: string) => {
+    try {
+      const { data: expense } = await supabase
+        .from('expenses')
+        .select('*')
+        .eq('id', id)
+        .single();
 
-    setExpenses(prev => prev.filter(e => e.id !== id));
+      if (!expense) return;
 
-    // If it's a feed purchase reference, clean it up from purchases as well
-    if (expense.isAutoGenerated && expense.referenceId) {
-      if (expense.category === 'Feed') {
-        setFeedPurchases(prev => prev.filter(p => p.id !== expense.referenceId));
-      } else if (expense.category === 'Medicine') {
-        setMedicalRecords(prev => prev.filter(m => m.id !== expense.referenceId));
+      await supabase.from('expenses').delete().eq('id', id);
+
+      if (expense.is_auto_generated && expense.reference_id) {
+        if (expense.category === 'Feed') {
+          await supabase.from('feed_purchases').delete().eq('id', expense.reference_id);
+        } else if (expense.category === 'Medicine') {
+          await supabase.from('medical_records').delete().eq('id', expense.reference_id);
+        }
       }
+    } catch (err) {
+      console.error('Failed to delete expense:', err);
     }
   };
 
@@ -647,3 +654,4 @@ export const useFarm = () => {
   }
   return context;
 };
+

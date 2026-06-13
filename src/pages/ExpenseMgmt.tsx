@@ -185,7 +185,7 @@ export const ExpenseMgmt: React.FC = () => {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Amount Cost ($)</label>
+            <label className="form-label">Amount Cost (Rs)</label>
             <input
               type="number"
               step="0.01"
@@ -290,3 +290,4 @@ export const ExpenseMgmt: React.FC = () => {
     </div>
   );
 };
+

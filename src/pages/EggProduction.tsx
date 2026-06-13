@@ -220,3 +220,4 @@ export const EggProduction: React.FC = () => {
     </div>
   );
 };
+

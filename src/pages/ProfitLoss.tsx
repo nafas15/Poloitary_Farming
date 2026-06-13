@@ -287,3 +287,4 @@ export const ProfitLoss: React.FC = () => {
     </div>
   );
 };
+

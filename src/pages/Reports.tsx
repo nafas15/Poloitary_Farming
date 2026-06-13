@@ -92,7 +92,7 @@ export const Reports: React.FC = () => {
 
   const exportCSV = () => {
     const csvRows = [
-      ['Date', 'Metric / Item', 'Category', 'Quantity / Value', 'Amount ($)'],
+      ['Date', 'Metric / Item', 'Category', 'Quantity / Value', 'Amount (Rs)'],
       // Sales
       ...sales.filter(s => isDateInPeriod(s.date)).map(s => [
         s.date,
@@ -230,7 +230,7 @@ export const Reports: React.FC = () => {
                 <th>Source Metric</th>
                 <th>Accounting Ledger</th>
                 <th>Quantity</th>
-                <th style={{ textAlign: 'right' }}>Cash Impact ($)</th>
+                <th style={{ textAlign: 'right' }}>Cash Impact (Rs)</th>
               </tr>
             </thead>
             <tbody>
@@ -356,3 +356,4 @@ export const Reports: React.FC = () => {
     </div>
   );
 };
+

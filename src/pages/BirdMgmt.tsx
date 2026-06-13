@@ -267,7 +267,7 @@ export const BirdMgmt: React.FC = () => {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Purchase Price per Bird ($)</label>
+            <label className="form-label">Purchase Price per Bird (Rs)</label>
             <input
               type="number"
               step="0.01"
@@ -419,3 +419,4 @@ export const BirdMgmt: React.FC = () => {
     </div>
   );
 };
+
