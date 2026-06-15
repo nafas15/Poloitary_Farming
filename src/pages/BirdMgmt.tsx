@@ -4,7 +4,7 @@ import type { BirdType } from '../context/FarmContext';
 import { Modal } from '../components/Modal';
 
 export const BirdMgmt: React.FC = () => {
-  const { batches, addBatch, logMortality } = useFarm();
+  const { batches, addBatch, logMortality, deleteBatch } = useFarm();
   
   // Tab Filter
   const [filter, setFilter] = useState<'Active' | 'Sold'>('Active');
@@ -143,18 +143,30 @@ export const BirdMgmt: React.FC = () => {
                           {mortalityPercent}%
                         </span>
                       </td>
-                      <td>${batch.purchasePrice.toFixed(2)}</td>
+                      <td>Rs {batch.purchasePrice.toFixed(2)}</td>
                       {filter === 'Active' && (
                         <td>
-                          <button
-                            className="btn btn-secondary btn-sm-custom"
-                            onClick={() => {
-                              setSelectedBatchId(batch.id);
-                              setIsMortalityModalOpen(true);
-                            }}
-                          >
-                            ☠️ Log Death
-                          </button>
+                          <div className="batch-action-group">
+                            <button
+                              className="btn btn-secondary btn-sm-custom"
+                              onClick={() => {
+                                setSelectedBatchId(batch.id);
+                                setIsMortalityModalOpen(true);
+                              }}
+                            >
+                              ☠️ Log Death
+                            </button>
+                            <button
+                              className="btn btn-danger btn-sm-custom"
+                              onClick={() => {
+                                if (confirm(`Delete Batch ${batch.id}? This will permanently remove the batch, its mortality logs, and the associated purchase expense. This cannot be undone.`)) {
+                                  deleteBatch(batch.id);
+                                }
+                              }}
+                            >
+                              🗑️ Delete
+                            </button>
+                          </div>
                         </td>
                       )}
                     </tr>
@@ -402,6 +414,13 @@ export const BirdMgmt: React.FC = () => {
         .btn-sm-custom {
           padding: 0.35rem 0.75rem;
           font-size: 0.75rem;
+        }
+
+        .batch-action-group {
+          display: flex;
+          gap: 0.4rem;
+          align-items: center;
+          flex-wrap: wrap;
         }
 
         .empty-state {

@@ -40,9 +40,9 @@ export const ProfitLoss: React.FC = () => {
   }).sort((a, b) => a.month.localeCompare(b.month));
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('en-IN', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'INR',
       maximumFractionDigits: 2
     }).format(amount);
   };
@@ -64,22 +64,22 @@ export const ProfitLoss: React.FC = () => {
       <div className="grid-cols-4 financials-overview">
         <div className="glass-card stat-card-profit">
           <span className="card-lbl">Gross Income</span>
-          <h3 className="card-val color-emerald">${totalIncome.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h3>
+          <h3 className="card-val color-emerald">Rs {totalIncome.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h3>
           <span className="card-helper-text">
-            Birds: ${birdIncome.toLocaleString()} | Eggs: ${eggIncome.toLocaleString()}
+            Birds: Rs {birdIncome.toLocaleString()} | Eggs: Rs {eggIncome.toLocaleString()}
           </span>
         </div>
 
         <div className="glass-card stat-card-profit">
           <span className="card-lbl">Gross Expenses</span>
-          <h3 className="card-val color-rose">${totalExpense.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h3>
+          <h3 className="card-val color-rose">Rs {totalExpense.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h3>
           <span className="card-helper-text">Feed, wages, and maintenance bills</span>
         </div>
 
         <div className="glass-card stat-card-profit">
           <span className="card-lbl">Net Profit / Loss</span>
           <h3 className={`card-val ${netProfit >= 0 ? 'color-emerald' : 'color-rose'}`}>
-            {netProfit >= 0 ? '+' : ''}${netProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            {netProfit >= 0 ? '+' : ''}Rs {netProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}
           </h3>
           <span className="card-helper-text">Net earnings after all cost deductions</span>
         </div>

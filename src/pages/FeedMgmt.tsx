@@ -104,7 +104,7 @@ export const FeedMgmt: React.FC = () => {
           <span className="feed-stat-icon">💰</span>
           <div>
             <div className="feed-stat-value">
-              ${totalSpent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              Rs {totalSpent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             <div className="feed-stat-label">Total Spent</div>
           </div>
@@ -197,7 +197,7 @@ export const FeedMgmt: React.FC = () => {
           <div className="card-header-row">
             <div>
               <h3>Feed Purchase History</h3>
-              <p className="chart-subtitle">{feedPurchases.length} records · ${totalSpent.toFixed(2)} total spent</p>
+              <p className="chart-subtitle">{feedPurchases.length} records · Rs {totalSpent.toFixed(2)} total spent</p>
             </div>
           </div>
           <div className="table-wrapper">
@@ -235,8 +235,8 @@ export const FeedMgmt: React.FC = () => {
                       </td>
                       <td><strong>{fp.quantityKg.toLocaleString()} kg</strong></td>
                       <td>{fp.vendor}</td>
-                      <td>${(fp.cost / fp.quantityKg).toFixed(2)}/kg</td>
-                      <td><strong className="color-emerald">${fp.cost.toFixed(2)}</strong></td>
+                      <td>Rs {(fp.cost / fp.quantityKg).toFixed(2)}/kg</td>
+                      <td><strong className="color-emerald">Rs {fp.cost.toFixed(2)}</strong></td>
                     </tr>
                   ))
                 )}
@@ -341,7 +341,7 @@ export const FeedMgmt: React.FC = () => {
           </div>
           {purchaseQty > 0 && purchaseCost > 0 && (
             <div className="form-preview-pill">
-              💡 Cost per kg: <strong>${(purchaseCost / purchaseQty).toFixed(2)}</strong>
+              💡 Cost per kg: <strong>Rs {(purchaseCost / purchaseQty).toFixed(2)}</strong>
             </div>
           )}
         </form>

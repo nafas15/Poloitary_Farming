@@ -53,25 +53,25 @@ export const ExpenseMgmt: React.FC = () => {
       <div className="grid-cols-4 expense-summary-container">
         <div className="glass-card summary-card feed">
           <span className="summary-label">Feed Bills</span>
-          <h3 className="summary-value">${getCategoryTotal('Feed').toLocaleString()}</h3>
+          <h3 className="summary-value">Rs {getCategoryTotal('Feed').toLocaleString()}</h3>
           <div className="cat-dot feed"></div>
         </div>
 
         <div className="glass-card summary-card medicine">
           <span className="summary-label">Medicine / Health</span>
-          <h3 className="summary-value">${getCategoryTotal('Medicine').toLocaleString()}</h3>
+          <h3 className="summary-value">Rs {getCategoryTotal('Medicine').toLocaleString()}</h3>
           <div className="cat-dot medicine"></div>
         </div>
 
         <div className="glass-card summary-card utilities">
           <span className="summary-label">Utilities (Elect. & Water)</span>
-          <h3 className="summary-value">${(getCategoryTotal('Electricity') + getCategoryTotal('Water')).toLocaleString()}</h3>
+          <h3 className="summary-value">Rs {(getCategoryTotal('Electricity') + getCategoryTotal('Water')).toLocaleString()}</h3>
           <div className="cat-dot utilities"></div>
         </div>
 
         <div className="glass-card summary-card labor">
           <span className="summary-label">Labor & Salaries</span>
-          <h3 className="summary-value">${getCategoryTotal('Labor').toLocaleString()}</h3>
+          <h3 className="summary-value">Rs {getCategoryTotal('Labor').toLocaleString()}</h3>
           <div className="cat-dot labor"></div>
         </div>
       </div>
@@ -83,7 +83,7 @@ export const ExpenseMgmt: React.FC = () => {
             <h4>Expense Ledger Statement</h4>
             <p className="chart-subtitle">Comprehensive cash outflows including auto-generated stock purchases</p>
           </div>
-          <h4 className="color-rose-glow-text">Total Outflow: ${totalExpense.toLocaleString()}</h4>
+          <h4 className="color-rose-glow-text">Total Outflow: Rs {totalExpense.toLocaleString()}</h4>
         </div>
 
         {expenses.length === 0 ? (
@@ -122,7 +122,7 @@ export const ExpenseMgmt: React.FC = () => {
                         <span className="badge badge-secondary text-xxs">Manual Log</span>
                       )}
                     </td>
-                    <td><b>${e.amount.toFixed(2)}</b></td>
+                    <td><b>Rs {e.amount.toFixed(2)}</b></td>
                     <td>
                       <button
                         className="btn btn-danger btn-xs-custom"

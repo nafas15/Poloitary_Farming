@@ -78,7 +78,7 @@ export const SalesMgmt: React.FC = () => {
         <div className="sales-stat-card">
           <span className="sales-stat-icon">💰</span>
           <div>
-            <div className="sales-stat-value">${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div className="sales-stat-value">Rs {totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
             <div className="sales-stat-label">Total Revenue</div>
           </div>
         </div>
@@ -130,7 +130,7 @@ export const SalesMgmt: React.FC = () => {
           <div className="sm-card-header">
             <div>
               <h3>Sales Transactions Ledger</h3>
-              <p className="chart-subtitle">{sales.length} invoices · ${totalRevenue.toFixed(2)} total revenue</p>
+              <p className="chart-subtitle">{sales.length} invoices · Rs {totalRevenue.toFixed(2)} total revenue</p>
             </div>
           </div>
 
@@ -175,8 +175,8 @@ export const SalesMgmt: React.FC = () => {
                         </span>
                       </td>
                       <td>{s.quantity.toLocaleString()} {s.type === 'Bird' ? 'birds' : 'crates'}</td>
-                      <td>${s.unitPrice.toFixed(2)}</td>
-                      <td><strong className="revenue-amount">${s.totalAmount.toFixed(2)}</strong></td>
+                      <td>Rs {s.unitPrice.toFixed(2)}</td>
+                      <td><strong className="revenue-amount">Rs {s.totalAmount.toFixed(2)}</strong></td>
                       <td>
                         <button className="btn btn-secondary btn-xs-custom" onClick={() => handleViewInvoice(s)}>
                           👁️ Invoice
@@ -255,7 +255,7 @@ export const SalesMgmt: React.FC = () => {
                     </div>
                     <div className="summary-row">
                       <span>Unit Price</span>
-                      <strong>${birdUnitPrice.toFixed(2)}/bird</strong>
+                      <strong>Rs {birdUnitPrice.toFixed(2)}/bird</strong>
                     </div>
                     {selectedBatch && (
                       <div className="summary-row">
@@ -267,7 +267,7 @@ export const SalesMgmt: React.FC = () => {
                     )}
                     <div className="summary-row summary-total">
                       <span>Invoice Total</span>
-                      <strong>${(birdQty * birdUnitPrice).toFixed(2)}</strong>
+                      <strong>Rs {(birdQty * birdUnitPrice).toFixed(2)}</strong>
                     </div>
                   </div>
                 )}
@@ -332,7 +332,7 @@ export const SalesMgmt: React.FC = () => {
                   </div>
                   <div className="summary-row summary-total">
                     <span>Invoice Total</span>
-                    <strong>${(eggCrates * eggPricePerCrate).toFixed(2)}</strong>
+                    <strong>Rs {(eggCrates * eggPricePerCrate).toFixed(2)}</strong>
                   </div>
                 </div>
               )}
@@ -406,16 +406,16 @@ export const SalesMgmt: React.FC = () => {
                     )}
                   </td>
                   <td>{activeInvoice.quantity.toLocaleString()} {activeInvoice.type === 'Bird' ? 'birds' : 'crates'}</td>
-                  <td>${activeInvoice.unitPrice.toFixed(2)}</td>
-                  <td><strong>${activeInvoice.totalAmount.toFixed(2)}</strong></td>
+                  <td>Rs {activeInvoice.unitPrice.toFixed(2)}</td>
+                  <td><strong>Rs {activeInvoice.totalAmount.toFixed(2)}</strong></td>
                 </tr>
               </tbody>
             </table>
 
             <div className="invoice-calculations">
-              <div className="calc-row"><span>Subtotal:</span><span>${activeInvoice.totalAmount.toFixed(2)}</span></div>
+              <div className="calc-row"><span>Subtotal:</span><span>Rs {activeInvoice.totalAmount.toFixed(2)}</span></div>
               <div className="calc-row"><span>Tax (0%):</span><span>Rs 0.00</span></div>
-              <div className="calc-row grand-total"><span>Grand Total:</span><span>${activeInvoice.totalAmount.toFixed(2)}</span></div>
+              <div className="calc-row grand-total"><span>Grand Total:</span><span>Rs {activeInvoice.totalAmount.toFixed(2)}</span></div>
             </div>
 
             <div className="invoice-footer-notes">

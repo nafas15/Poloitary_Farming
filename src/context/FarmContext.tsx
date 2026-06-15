@@ -113,6 +113,7 @@ interface FarmContextType {
   logout: () => void;
   batches: BirdBatch[];
   addBatch: (batch: Omit<BirdBatch, 'currentQuantity' | 'mortalityLogs' | 'status'>) => void;
+  deleteBatch: (batchId: string) => void;
   sellBatch: (batchId: string, quantity: number, pricePerBird: number, customerName: string, customerContact: string) => void;
   logMortality: (batchId: string, quantity: number, reason: string, date: string) => void;
   feedPurchases: FeedPurchase[];
@@ -446,7 +447,19 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // 2. Feed Management
+  const deleteBatch = async (batchId: string) => {
+    try {
+      // Delete all mortality logs for this batch
+      await supabase.from('mortality_logs').delete().eq('batch_id', batchId);
+      // Delete the auto-generated batch purchase expense
+      await supabase.from('expenses').delete().eq('reference_id', batchId).eq('is_auto_generated', true);
+      // Delete the batch itself
+      await supabase.from('batches').delete().eq('id', batchId);
+    } catch (err) {
+      console.error('Failed to delete batch:', err);
+    }
+  };
+
   const addFeedPurchase = async (purchase: Omit<FeedPurchase, 'id'>) => {
     const id = `fp-${Date.now()}`;
     const newPurchase = {
@@ -621,6 +634,7 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
         logout,
         batches,
         addBatch,
+        deleteBatch,
         sellBatch,
         logMortality,
         feedPurchases,

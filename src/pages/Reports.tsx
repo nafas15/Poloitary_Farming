@@ -211,9 +211,9 @@ export const Reports: React.FC = () => {
         <div className="glass-card r-kpi">
           <span className="r-label">Statement Net Profit</span>
           <h3 className={`r-value ${netPAndL >= 0 ? 'color-emerald' : 'color-rose'}`}>
-            {netPAndL >= 0 ? '+' : ''}${netPAndL.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            {netPAndL >= 0 ? '+' : ''}Rs {netPAndL.toLocaleString(undefined, { maximumFractionDigits: 0 })}
           </h3>
-          <span className="r-sub">Revenue: ${periodIncome.toLocaleString()} | Costs: ${periodExpense.toLocaleString()}</span>
+          <span className="r-sub">Revenue: Rs {periodIncome.toLocaleString()} | Costs: Rs {periodExpense.toLocaleString()}</span>
         </div>
       </div>
 
@@ -241,7 +241,7 @@ export const Reports: React.FC = () => {
                   <td><b>{s.type} Sale</b> ({s.customerName})</td>
                   <td><span className="badge badge-emerald">Revenue Income</span></td>
                   <td>{s.quantity.toLocaleString()} {s.type === 'Bird' ? 'birds' : 'crates'}</td>
-                  <td className="color-emerald" style={{ textAlign: 'right' }}><b>+${s.totalAmount.toFixed(2)}</b></td>
+                  <td className="color-emerald" style={{ textAlign: 'right' }}><b>+Rs {s.totalAmount.toFixed(2)}</b></td>
                 </tr>
               ))}
 
@@ -252,7 +252,7 @@ export const Reports: React.FC = () => {
                   <td>{e.description}</td>
                   <td><span className="badge badge-rose">Expense Outflow</span></td>
                   <td>-</td>
-                  <td className="color-rose" style={{ textAlign: 'right' }}><b>-${e.amount.toFixed(2)}</b></td>
+                  <td className="color-rose" style={{ textAlign: 'right' }}><b>-Rs {e.amount.toFixed(2)}</b></td>
                 </tr>
               ))}
 
@@ -274,6 +274,7 @@ export const Reports: React.FC = () => {
         .reports-page {
           display: flex;
           flex-direction: column;
+          gap: var(--spacing-lg);
         }
 
         .page-header-actions {
@@ -281,34 +282,81 @@ export const Reports: React.FC = () => {
           align-items: center;
           justify-content: space-between;
           margin-bottom: var(--spacing-lg);
+          flex-wrap: wrap;
+          gap: var(--spacing-md);
+        }
+
+        .filter-tabs {
+          display: flex;
+          gap: var(--spacing-sm);
+          background: rgba(22, 31, 48, 0.4);
+          padding: 0.25rem;
+          border-radius: var(--radius-md);
+          border: 1px solid var(--border-color);
+          flex-wrap: wrap;
+        }
+
+        .tab-btn {
+          background: none;
+          border: none;
+          color: var(--text-secondary);
+          padding: 0.5rem 1rem;
+          border-radius: var(--radius-sm);
+          cursor: pointer;
+          font-family: var(--font-family);
+          font-weight: 600;
+          font-size: 0.85rem;
+          transition: all var(--transition-fast);
+          white-space: nowrap;
+        }
+
+        .tab-btn.active {
+          background: rgba(255,255,255,0.08);
+          color: var(--text-primary);
         }
 
         .action-buttons-group {
           display: flex;
           gap: var(--spacing-sm);
+          flex-wrap: wrap;
         }
 
         .report-kpis-container {
-          margin-top: var(--spacing-sm);
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: var(--spacing-lg);
+        }
+
+        @media (max-width: 1100px) {
+          .report-kpis-container { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        @media (max-width: 580px) {
+          .report-kpis-container { grid-template-columns: 1fr; }
         }
 
         .r-kpi {
           display: flex;
           flex-direction: column;
-          gap: 0.25rem;
+          gap: 0.35rem;
+          position: relative;
+          overflow: hidden;
         }
 
         .r-label {
-          font-size: 0.78rem;
+          font-size: 0.75rem;
           text-transform: uppercase;
-          letter-spacing: 0.05em;
+          letter-spacing: 0.06em;
           color: var(--text-secondary);
+          font-weight: 500;
         }
 
         .r-value {
-          font-size: 1.5rem;
-          font-weight: 700;
+          font-size: 1.6rem;
+          font-weight: 800;
           color: var(--text-primary);
+          line-height: 1.15;
+          word-break: break-word;
         }
 
         .r-value.color-rose { color: var(--color-rose); }
@@ -317,6 +365,18 @@ export const Reports: React.FC = () => {
         .r-sub {
           font-size: 0.7rem;
           color: var(--text-muted);
+          line-height: 1.4;
+          word-break: break-word;
+        }
+
+        .custom-date-selector .form-row {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: var(--spacing-md);
+        }
+
+        @media (max-width: 500px) {
+          .custom-date-selector .form-row { grid-template-columns: 1fr; }
         }
 
         /* Print Specifics for Report Header */
@@ -326,7 +386,6 @@ export const Reports: React.FC = () => {
           }
           
           .report-kpis-container {
-            display: grid !important;
             grid-template-columns: repeat(4, 1fr) !important;
             gap: 15px !important;
             margin-bottom: 2rem !important;
@@ -341,7 +400,7 @@ export const Reports: React.FC = () => {
           
           .r-value {
             color: #000000 !important;
-            font-size: 1.25rem !important;
+            font-size: 1.1rem !important;
           }
           
           .r-sub, .r-label {
