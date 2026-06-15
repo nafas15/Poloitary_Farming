@@ -3,14 +3,22 @@ import { useFarm } from '../context/FarmContext';
 import { Modal } from '../components/Modal';
 
 export const EggProduction: React.FC = () => {
-  const { eggCollections, addEggCollection } = useFarm();
+  const { eggCollections, addEggCollection, deleteEggCollection, addEggSale } = useFarm();
   
   const [isCollectModalOpen, setIsCollectModalOpen] = useState(false);
+  const [isSellModalOpen, setIsSellModalOpen] = useState(false);
 
   // Form Fields - Egg Collection
   const [collectDate, setCollectDate] = useState(new Date().toISOString().split('T')[0]);
   const [collectQty, setCollectQty] = useState<number>(800);
   const [collectDamaged, setCollectDamaged] = useState<number>(10);
+
+  // Form Fields - Sell Eggs
+  const [eggCrates, setEggCrates] = useState<number>(10);
+  const [eggPricePerCrate, setEggPricePerCrate] = useState<number>(5.50);
+  const [eggCustomer, setEggCustomer] = useState('');
+  const [eggContact, setEggContact] = useState('');
+  const [eggDetails, setEggDetails] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,6 +36,25 @@ export const EggProduction: React.FC = () => {
     setIsCollectModalOpen(false);
   };
 
+  const handleEggSaleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!eggCustomer.trim() || eggCrates <= 0) return;
+    addEggSale({
+      date: new Date().toISOString().split('T')[0],
+      customerName: eggCustomer,
+      customerContact: eggContact,
+      quantity: eggCrates,
+      unitPrice: eggPricePerCrate,
+      totalAmount: eggCrates * eggPricePerCrate,
+      details: eggDetails || `Egg Sale: ${eggCrates} crates (30 eggs/crate)`
+    });
+    setEggCustomer('');
+    setEggContact('');
+    setEggDetails('');
+    setEggCrates(10);
+    setIsSellModalOpen(false);
+  };
+
   // Performance calculations
   const totalCollected = eggCollections.reduce((sum, c) => sum + c.collectedQty, 0);
   const totalDamaged = eggCollections.reduce((sum, c) => sum + c.damagedQty, 0);
@@ -39,9 +66,14 @@ export const EggProduction: React.FC = () => {
     <div className="egg-production-page animate-fade-in">
       <div className="page-header-actions">
         <h4 className="section-title">Egg Collection Dashboard</h4>
-        <button className="btn btn-primary" onClick={() => setIsCollectModalOpen(true)}>
-          🥚 Log Daily Egg Collection
-        </button>
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <button type="button" className="btn btn-secondary" onClick={() => setIsSellModalOpen(true)}>
+            🥚 Sell Eggs
+          </button>
+          <button type="button" className="btn btn-primary" onClick={() => setIsCollectModalOpen(true)}>
+            🥚 Log Daily Egg Collection
+          </button>
+        </div>
       </div>
 
       {/* Yield Analytics Cards */}
@@ -91,6 +123,7 @@ export const EggProduction: React.FC = () => {
                   <th>Usable Eggs (Net)</th>
                   <th>Tray Equivalent (30/Tray)</th>
                   <th>Status</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -107,6 +140,26 @@ export const EggProduction: React.FC = () => {
                         <span className={`badge ${c.damagedQty / c.collectedQty < 0.02 ? 'badge-emerald' : 'badge-amber'}`}>
                           {c.damagedQty / c.collectedQty < 0.02 ? 'Optimal' : 'Needs attention'}
                         </span>
+                      </td>
+                      <td>
+                        <button
+                          className="btn btn-danger"
+                          onClick={() => {
+                            if (confirm(`Delete egg collection record for ${c.date}?`)) {
+                              deleteEggCollection(c.date);
+                            }
+                          }}
+                          style={{
+                            padding: '0.25rem 0.5rem',
+                            fontSize: '0.75rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.25rem',
+                            margin: '0 auto'
+                          }}
+                        >
+                          🗑️ Delete
+                        </button>
                       </td>
                     </tr>
                   );
@@ -165,6 +218,118 @@ export const EggProduction: React.FC = () => {
               />
             </div>
           </div>
+        </form>
+      </Modal>
+
+      {/* Modal: Sell Eggs */}
+      <Modal
+        isOpen={isSellModalOpen}
+        onClose={() => setIsSellModalOpen(false)}
+        title="Register Egg Sale"
+        footer={
+          <>
+            <button type="button" className="btn btn-secondary" onClick={() => setIsSellModalOpen(false)}>Cancel</button>
+            <button type="button" className="btn btn-primary" onClick={handleEggSaleSubmit}>Complete Sale</button>
+          </>
+        }
+      >
+        <form onSubmit={handleEggSaleSubmit} className="modal-form-grid">
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Quantity (Crates of 30)</label>
+              <input
+                type="number"
+                min="1"
+                className="form-control"
+                value={eggCrates}
+                onChange={e => setEggCrates(Number(e.target.value))}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Price per Crate (Rs)</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0.1"
+                className="form-control"
+                value={eggPricePerCrate}
+                onChange={e => setEggPricePerCrate(Number(e.target.value))}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Customer Name</label>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="e.g. Sunny Bakehouses Co."
+                value={eggCustomer}
+                onChange={e => setEggCustomer(e.target.value)}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Customer Contact</label>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="e.g. +1 (555) 012-9900"
+                value={eggContact}
+                onChange={e => setEggContact(e.target.value)}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Remarks / Description</label>
+            <input
+              type="text"
+              className="form-control"
+              placeholder="e.g. Grade A large brown eggs"
+              value={eggDetails}
+              onChange={e => setEggDetails(e.target.value)}
+            />
+          </div>
+
+          {eggCrates > 0 && eggPricePerCrate > 0 && (
+            <div className="sm-order-summary" style={{
+              background: 'rgba(16,185,129,0.05)',
+              border: '1px solid rgba(16,185,129,0.15)',
+              borderRadius: 'var(--radius-md)',
+              padding: 'var(--spacing-md) var(--spacing-lg)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.4rem',
+              marginTop: '0.5rem'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
+                <span>Crates</span>
+                <strong>{eggCrates.toLocaleString()}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
+                <span>Eggs Total</span>
+                <strong>{(eggCrates * 30).toLocaleString()} eggs</strong>
+              </div>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                fontSize: '1rem',
+                fontWeight: '700',
+                color: 'var(--color-emerald)',
+                borderTop: '1px solid rgba(16,185,129,0.2)',
+                paddingTop: '0.4rem',
+                marginTop: '0.2rem'
+              }}>
+                <span>Invoice Total</span>
+                <strong>Rs {(eggCrates * eggPricePerCrate).toFixed(2)}</strong>
+              </div>
+            </div>
+          )}
         </form>
       </Modal>
 

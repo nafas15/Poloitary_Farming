@@ -18,7 +18,7 @@ const Reports      = lazy(() => import('./pages/Reports').then(m => ({ default: 
 import './styles/index.css';
 
 // Lightweight page-transition loader
-function PageLoader() {
+function PageLoader({ message = 'Loading...' }: { message?: string }) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -31,14 +31,14 @@ function PageLoader() {
         borderRadius: '50%',
         animation: 'spin 0.7s linear infinite'
       }} />
-      <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Loading...</span>
+      <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{message}</span>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
 
 function MainAppContent() {
-  const { currentUser } = useFarm();
+  const { currentUser, isLoading } = useFarm();
   const [activeTab, setActiveTab] = useState('dashboard');
 
   // If not logged in, render the login page
@@ -69,9 +69,13 @@ function MainAppContent() {
       <main className="main-content">
         <Header activeTab={activeTab} />
         <div className="tab-page-container">
-          <Suspense fallback={<PageLoader />}>
-            {renderTabContent()}
-          </Suspense>
+          {isLoading ? (
+            <PageLoader message="Syncing with database..." />
+          ) : (
+            <Suspense fallback={<PageLoader message="Loading page..." />}>
+              {renderTabContent()}
+            </Suspense>
+          )}
         </div>
       </main>
     </div>

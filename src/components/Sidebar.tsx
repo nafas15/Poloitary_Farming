@@ -125,8 +125,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
       <div className="sidebar-logo">
         <div className="logo-icon">🐔</div>
         <div className="logo-text">
-          <h2>FeatherFlow</h2>
-          <span>Poultry Farm ERP</span>
+          <h2>AKSHA FARM</h2>
+          <span>Premium Poultry Products</span>
         </div>
       </div>
 

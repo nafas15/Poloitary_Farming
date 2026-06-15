@@ -3,7 +3,7 @@ import { useFarm } from '../context/FarmContext';
 import { Modal } from '../components/Modal';
 
 export const HealthMgmt: React.FC = () => {
-  const { batches, vaccines, medicalRecords, addVaccineSchedule, updateVaccineStatus, addMedicalRecord } = useFarm();
+  const { batches, vaccines, medicalRecords, addVaccineSchedule, updateVaccineStatus, addMedicalRecord, deleteVaccineSchedule } = useFarm();
 
   const [subTab, setSubTab] = useState<'vaccines' | 'medical'>('vaccines');
   const [isVaccineModalOpen, setIsVaccineModalOpen] = useState(false);
@@ -76,7 +76,7 @@ export const HealthMgmt: React.FC = () => {
         <div className="health-stat-card">
           <span className="health-stat-icon">💊</span>
           <div>
-            <div className="health-stat-value">${totalMedCost.toFixed(2)}</div>
+            <div className="health-stat-value">Rs {totalMedCost.toFixed(2)}</div>
             <div className="health-stat-label">Medical Spend</div>
           </div>
         </div>
@@ -152,15 +152,27 @@ export const HealthMgmt: React.FC = () => {
                         </span>
                       </td>
                       <td>
-                        {v.status === 'Pending' ? (
-                          <button className="btn btn-primary btn-xs-custom" onClick={() => updateVaccineStatus(v.id, 'Completed')}>
-                            ✓ Mark Done
+                        <div style={{ display: 'flex', gap: '0.35rem' }}>
+                          {v.status === 'Pending' ? (
+                            <button className="btn btn-primary btn-xs-custom" onClick={() => updateVaccineStatus(v.id, 'Completed')}>
+                              ✓ Mark Done
+                            </button>
+                          ) : (
+                            <button className="btn btn-secondary btn-xs-custom" onClick={() => updateVaccineStatus(v.id, 'Pending')}>
+                              ↺ Revert
+                            </button>
+                          )}
+                          <button
+                            className="btn btn-danger btn-xs-custom"
+                            onClick={() => {
+                              if (window.confirm(`Are you sure you want to delete the vaccine schedule for "${v.vaccineName}"?`)) {
+                                deleteVaccineSchedule(v.id);
+                              }
+                            }}
+                          >
+                            🗑️ Delete
                           </button>
-                        ) : (
-                          <button className="btn btn-secondary btn-xs-custom" onClick={() => updateVaccineStatus(v.id, 'Pending')}>
-                            ↺ Revert
-                          </button>
-                        )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -177,7 +189,7 @@ export const HealthMgmt: React.FC = () => {
           <div className="hm-card-header">
             <div>
               <h3>Medical Record & Treatment Log</h3>
-              <p className="chart-subtitle">{medicalRecords.length} treatments · ${totalMedCost.toFixed(2)} total spent</p>
+              <p className="chart-subtitle">{medicalRecords.length} treatments · Rs {totalMedCost.toFixed(2)} total spent</p>
             </div>
           </div>
 
@@ -210,7 +222,7 @@ export const HealthMgmt: React.FC = () => {
                       <td><span className="disease-tag">🦠 {m.disease}</span></td>
                       <td><span className="medicine-tag">💊 {m.medicine}</span></td>
                       <td className="dosage-cell">{m.dosage}</td>
-                      <td><strong className="cost-highlight">${m.cost.toFixed(2)}</strong></td>
+                      <td><strong className="cost-highlight">Rs {m.cost.toFixed(2)}</strong></td>
                     </tr>
                   ))}
                 </tbody>

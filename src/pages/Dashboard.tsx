@@ -22,11 +22,8 @@ export const Dashboard: React.FC = () => {
 
   // Format Helper
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      maximumFractionDigits: 0
-    }).format(amount);
+    const formatted = Math.abs(amount).toLocaleString(undefined, { maximumFractionDigits: 0 });
+    return amount < 0 ? `-Rs ${formatted}` : `Rs ${formatted}`;
   };
 
 

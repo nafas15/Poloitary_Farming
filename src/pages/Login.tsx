@@ -48,7 +48,7 @@ export const Login: React.FC = () => {
       <div className="login-card glass-card">
         <div className="login-header">
           <div className="login-logo">🐔</div>
-          <h2>FeatherFlow ERP</h2>
+          <h2>AKSHA FARM ERP</h2>
           <p>Poultry Farm Management System</p>
         </div>
 

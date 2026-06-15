@@ -1,5 +1,5 @@
 -- =========================================================================
--- FEATHERFLOW ERP DATABASE SCHEMA
+-- AKSHA FARM ERP DATABASE SCHEMA
 -- Execute this script in your Supabase SQL Editor to create all necessary tables.
 -- =========================================================================
 

@@ -40,11 +40,8 @@ export const ProfitLoss: React.FC = () => {
   }).sort((a, b) => a.month.localeCompare(b.month));
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      maximumFractionDigits: 2
-    }).format(amount);
+    const formatted = Math.abs(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return amount < 0 ? `-Rs ${formatted}` : `Rs ${formatted}`;
   };
 
   const getMonthName = (monthStr: string) => {

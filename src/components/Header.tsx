@@ -39,11 +39,8 @@ export const Header: React.FC<HeaderProps> = ({ activeTab }) => {
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      maximumFractionDigits: 0
-    }).format(amount);
+    const formatted = Math.abs(amount).toLocaleString(undefined, { maximumFractionDigits: 0 });
+    return amount < 0 ? `-Rs ${formatted}` : `Rs ${formatted}`;
   };
 
   return (
