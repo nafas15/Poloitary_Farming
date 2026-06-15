@@ -4,13 +4,14 @@ import type { BirdType } from '../context/FarmContext';
 import { Modal } from '../components/Modal';
 
 export const BirdMgmt: React.FC = () => {
-  const { batches, addBatch, logMortality, deleteBatch } = useFarm();
+  const { batches, addBatch, logMortality, deleteBatch, sellBatch } = useFarm();
   
   // Tab Filter
   const [filter, setFilter] = useState<'Active' | 'Sold'>('Active');
   
   // Modals Open State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isSellModalOpen, setIsSellModalOpen] = useState(false);
   const [isMortalityModalOpen, setIsMortalityModalOpen] = useState(false);
   const [selectedBatchId, setSelectedBatchId] = useState<string>('');
 
@@ -21,11 +22,17 @@ export const BirdMgmt: React.FC = () => {
   const [newQty, setNewQty] = useState<number>(1000);
   const [newPrice, setNewPrice] = useState<number>(1.20);
 
+  // Form Fields - Sell Batch
+  const [sellBatchId, setSellBatchId] = useState('');
+  const [sellQty, setSellQty] = useState<number>(100);
+  const [sellUnitPrice, setSellUnitPrice] = useState<number>(0);
+  const [sellCustomer, setSellCustomer] = useState('');
+  const [sellContact, setSellContact] = useState('');
+
   // Form Fields - Log Mortality
   const [mortalityQty, setMortalityQty] = useState<number>(1);
   const [mortalityReason, setMortalityReason] = useState('');
   const [mortalityDate, setMortalityDate] = useState(new Date().toISOString().split('T')[0]);
-
 
   // Utility to calculate bird age in weeks
   const calculateAgeWeeks = (arrivalDateStr: string): number => {
@@ -67,11 +74,32 @@ export const BirdMgmt: React.FC = () => {
     setIsMortalityModalOpen(false);
   };
 
+  const handleSellSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!sellBatchId || !sellCustomer.trim() || sellQty <= 0) return;
+    const batch = batches.find(b => b.id === sellBatchId);
+    if (!batch || batch.currentQuantity < sellQty) {
+      alert(`Insufficient birds. Only ${batch?.currentQuantity ?? 0} remaining in Batch ${sellBatchId}.`);
+      return;
+    }
+    sellBatch(sellBatchId, sellQty, sellUnitPrice, sellCustomer, sellContact);
+    // Reset and Close
+    setSellBatchId('');
+    setSellQty(100);
+    setSellUnitPrice(0);
+    setSellCustomer('');
+    setSellContact('');
+    setIsSellModalOpen(false);
+  };
+
+  const activeBatches = batches.filter(b => b.status === 'Active' && b.currentQuantity > 0);
+  const selectedSellBatch = activeBatches.find(b => b.id === sellBatchId);
+
   const filteredBatches = batches.filter(b => b.status === filter);
 
   return (
     <div className="bird-mgmt-page animate-fade-in">
-      <div className="page-header-actions">
+        <div className="page-header-actions">
         <div className="filter-tabs">
           <button
             className={`tab-btn ${filter === 'Active' ? 'active' : ''}`}
@@ -87,16 +115,26 @@ export const BirdMgmt: React.FC = () => {
           </button>
         </div>
 
-        <button className="btn btn-primary" onClick={() => setIsAddModalOpen(true)}>
-          ➕ Add New Bird Batch
-        </button>
+        {filter === 'Active' ? (
+          <button className="btn btn-primary" onClick={() => setIsAddModalOpen(true)}>
+            ➕ Add New Bird Batch
+          </button>
+        ) : (
+          <button className="btn btn-primary" onClick={() => setIsSellModalOpen(true)}>
+            🐔 Sell Bird Batch
+          </button>
+        )}
       </div>
 
       {/* Batches Table */}
       <div className="glass-card table-section">
         {filteredBatches.length === 0 ? (
           <div className="empty-state">
-            <p>No {filter.toLowerCase()} batches found. Click "Add New Bird Batch" to register.</p>
+            {filter === 'Active' ? (
+              <p>No active batches found. Click "Add New Bird Batch" to register one.</p>
+            ) : (
+              <p>No sold/archived batches yet. Use "Sell Bird Batch" to record a sale.</p>
+            )}
           </div>
         ) : (
           <div className="table-wrapper">
@@ -293,7 +331,113 @@ export const BirdMgmt: React.FC = () => {
         </form>
       </Modal>
 
-      {/* 2. Modal Log Mortality */}
+      {/* 2. Modal - Sell Bird Batch */}
+      <Modal
+        isOpen={isSellModalOpen}
+        onClose={() => setIsSellModalOpen(false)}
+        title="🐔 Sell Bird Batch"
+        footer={
+          <>
+            <button className="btn btn-secondary" onClick={() => setIsSellModalOpen(false)}>Cancel</button>
+            <button className="btn btn-primary" onClick={handleSellSubmit}>Complete Sale</button>
+          </>
+        }
+      >
+        <form onSubmit={handleSellSubmit} className="modal-form-grid">
+          <div className="form-group">
+            <label className="form-label">Batch ID / Reference</label>
+            {activeBatches.length === 0 ? (
+              <div style={{ color: 'var(--color-rose)', fontSize: '0.88rem', padding: '0.5rem 0' }}>
+                ⚠️ No active batches with available stock to sell.
+              </div>
+            ) : (
+              <select
+                className="form-control"
+                value={sellBatchId}
+                onChange={e => setSellBatchId(e.target.value)}
+                required
+              >
+                <option value="">Select a batch...</option>
+                {activeBatches.map(b => (
+                  <option key={b.id} value={b.id}>
+                    {b.id} — {b.type} ({b.currentQuantity.toLocaleString()} birds available)
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Quantity to Sell</label>
+              <input
+                type="number"
+                min="1"
+                max={selectedSellBatch?.currentQuantity ?? undefined}
+                className="form-control"
+                value={sellQty}
+                onChange={e => setSellQty(Number(e.target.value))}
+                required
+              />
+              {selectedSellBatch && (
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                  Max: {selectedSellBatch.currentQuantity.toLocaleString()} birds
+                </span>
+              )}
+            </div>
+            <div className="form-group">
+              <label className="form-label">Price per Bird (Rs)</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                className="form-control"
+                value={sellUnitPrice}
+                onChange={e => setSellUnitPrice(Number(e.target.value))}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Customer Name</label>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="e.g. Fresh Meats Co."
+                value={sellCustomer}
+                onChange={e => setSellCustomer(e.target.value)}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Customer Contact</label>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="e.g. +91 98765 43210"
+                value={sellContact}
+                onChange={e => setSellContact(e.target.value)}
+                required
+              />
+            </div>
+          </div>
+
+          {sellQty > 0 && sellUnitPrice > 0 && (
+            <div className="sell-summary-preview">
+              <div className="sell-summary-row"><span>Quantity</span><strong>{sellQty.toLocaleString()} birds</strong></div>
+              <div className="sell-summary-row"><span>Unit Price</span><strong>Rs {sellUnitPrice.toFixed(2)}/bird</strong></div>
+              <div className="sell-summary-row sell-summary-total">
+                <span>Invoice Total</span>
+                <strong>Rs {(sellQty * sellUnitPrice).toFixed(2)}</strong>
+              </div>
+            </div>
+          )}
+        </form>
+      </Modal>
+
+      {/* 3. Modal Log Mortality */}
       <Modal
         isOpen={isMortalityModalOpen}
         onClose={() => setIsMortalityModalOpen(false)}
@@ -433,6 +577,32 @@ export const BirdMgmt: React.FC = () => {
           display: flex;
           flex-direction: column;
           gap: var(--spacing-md);
+        }
+
+        .sell-summary-preview {
+          background: rgba(16, 185, 129, 0.05);
+          border: 1px solid rgba(16, 185, 129, 0.15);
+          border-radius: var(--radius-md);
+          padding: var(--spacing-md) var(--spacing-lg);
+          display: flex;
+          flex-direction: column;
+          gap: 0.4rem;
+        }
+
+        .sell-summary-row {
+          display: flex;
+          justify-content: space-between;
+          font-size: 0.88rem;
+          color: var(--text-secondary);
+        }
+
+        .sell-summary-total {
+          font-size: 1rem;
+          font-weight: 700;
+          color: var(--color-emerald);
+          border-top: 1px solid rgba(16, 185, 129, 0.2);
+          padding-top: 0.4rem;
+          margin-top: 0.2rem;
         }
       `}</style>
     </div>
