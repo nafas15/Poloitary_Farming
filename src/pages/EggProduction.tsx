@@ -3,7 +3,7 @@ import { useFarm } from '../context/FarmContext';
 import { Modal } from '../components/Modal';
 
 export const EggProduction: React.FC = () => {
-  const { eggCollections, addEggCollection, deleteEggCollection, addEggSale } = useFarm();
+  const { eggCollections, addEggCollection, deleteEggCollection, addEggSale, updateEggCollection } = useFarm();
   
   const [isCollectModalOpen, setIsCollectModalOpen] = useState(false);
   const [isSellModalOpen, setIsSellModalOpen] = useState(false);
@@ -13,9 +13,36 @@ export const EggProduction: React.FC = () => {
   const [collectQty, setCollectQty] = useState<number>(800);
   const [collectDamaged, setCollectDamaged] = useState<number>(10);
 
+  // Edit Collection States
+  const [isEditCollectModalOpen, setIsEditCollectModalOpen] = useState(false);
+  const [editingCollectionOriginalDate, setEditingCollectionOriginalDate] = useState('');
+  const [editCollectDate, setEditCollectDate] = useState('');
+  const [editCollectQty, setEditCollectQty] = useState<number>(800);
+  const [editCollectDamaged, setEditCollectDamaged] = useState<number>(10);
+
+  const handleOpenEditCollect = (c: any) => {
+    setEditingCollectionOriginalDate(c.date);
+    setEditCollectDate(c.date);
+    setEditCollectQty(c.collectedQty);
+    setEditCollectDamaged(c.damagedQty);
+    setIsEditCollectModalOpen(true);
+  };
+
+  const handleEditCollectSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCollectionOriginalDate) return;
+    await updateEggCollection(editingCollectionOriginalDate, {
+      date: editCollectDate,
+      collectedQty: Number(editCollectQty),
+      damagedQty: Number(editCollectDamaged),
+      netQty: Number(editCollectQty) - Number(editCollectDamaged)
+    });
+    setIsEditCollectModalOpen(false);
+  };
+
   // Form Fields - Sell Eggs
-  const [eggCrates, setEggCrates] = useState<number>(10);
-  const [eggPricePerCrate, setEggPricePerCrate] = useState<number>(5.50);
+  const [eggQty, setEggQty] = useState<number>(300);
+  const [eggPricePerEgg, setEggPricePerEgg] = useState<number>(0.20);
   const [eggCustomer, setEggCustomer] = useState('');
   const [eggContact, setEggContact] = useState('');
   const [eggDetails, setEggDetails] = useState('');
@@ -38,20 +65,20 @@ export const EggProduction: React.FC = () => {
 
   const handleEggSaleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!eggCustomer.trim() || eggCrates <= 0) return;
+    if (!eggCustomer.trim() || eggQty <= 0) return;
     addEggSale({
       date: new Date().toISOString().split('T')[0],
       customerName: eggCustomer,
       customerContact: eggContact,
-      quantity: eggCrates,
-      unitPrice: eggPricePerCrate,
-      totalAmount: eggCrates * eggPricePerCrate,
-      details: eggDetails || `Egg Sale: ${eggCrates} crates (30 eggs/crate)`
+      quantity: eggQty,
+      unitPrice: eggPricePerEgg,
+      totalAmount: eggQty * eggPricePerEgg,
+      details: eggDetails || `Egg Sale: ${eggQty} eggs`
     });
     setEggCustomer('');
     setEggContact('');
     setEggDetails('');
-    setEggCrates(10);
+    setEggQty(300);
     setIsSellModalOpen(false);
   };
 
@@ -142,24 +169,39 @@ export const EggProduction: React.FC = () => {
                         </span>
                       </td>
                       <td>
-                        <button
-                          className="btn btn-danger"
-                          onClick={() => {
-                            if (confirm(`Delete egg collection record for ${c.date}?`)) {
-                              deleteEggCollection(c.date);
-                            }
-                          }}
-                          style={{
-                            padding: '0.25rem 0.5rem',
-                            fontSize: '0.75rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.25rem',
-                            margin: '0 auto'
-                          }}
-                        >
-                          🗑️ Delete
-                        </button>
+                        <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            onClick={() => handleOpenEditCollect(c)}
+                            style={{
+                              padding: '0.25rem 0.5rem',
+                              fontSize: '0.75rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.25rem'
+                            }}
+                          >
+                            ✏️ Edit
+                          </button>
+                          <button
+                            className="btn btn-danger"
+                            onClick={() => {
+                              if (confirm(`Delete egg collection record for ${c.date}?`)) {
+                                deleteEggCollection(c.date);
+                              }
+                            }}
+                            style={{
+                              padding: '0.25rem 0.5rem',
+                              fontSize: '0.75rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.25rem'
+                            }}
+                          >
+                            🗑️ Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -221,6 +263,57 @@ export const EggProduction: React.FC = () => {
         </form>
       </Modal>
 
+      {/* Modal: Edit Egg Collection */}
+      <Modal
+        isOpen={isEditCollectModalOpen}
+        onClose={() => setIsEditCollectModalOpen(false)}
+        title="✏️ Edit Egg Collection"
+        footer={
+          <>
+            <button className="btn btn-secondary" onClick={() => setIsEditCollectModalOpen(false)}>Cancel</button>
+            <button className="btn btn-primary" onClick={handleEditCollectSubmit}>Save Changes</button>
+          </>
+        }
+      >
+        <form onSubmit={handleEditCollectSubmit} className="modal-form-grid">
+          <div className="form-group">
+            <label className="form-label">Collection Date</label>
+            <input
+              type="date"
+              className="form-control"
+              value={editCollectDate}
+              onChange={e => setEditCollectDate(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Total Eggs Collected</label>
+              <input
+                type="number"
+                min="1"
+                className="form-control"
+                value={editCollectQty}
+                onChange={e => setEditCollectQty(Number(e.target.value))}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Damaged Eggs Count</label>
+              <input
+                type="number"
+                min="0"
+                className="form-control"
+                value={editCollectDamaged}
+                onChange={e => setEditCollectDamaged(Number(e.target.value))}
+                required
+              />
+            </div>
+          </div>
+        </form>
+      </Modal>
+
       {/* Modal: Sell Eggs */}
       <Modal
         isOpen={isSellModalOpen}
@@ -236,25 +329,25 @@ export const EggProduction: React.FC = () => {
         <form onSubmit={handleEggSaleSubmit} className="modal-form-grid">
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">Quantity (Crates of 30)</label>
+              <label className="form-label">Quantity of eggs</label>
               <input
                 type="number"
                 min="1"
                 className="form-control"
-                value={eggCrates}
-                onChange={e => setEggCrates(Number(e.target.value))}
+                value={eggQty}
+                onChange={e => setEggQty(Number(e.target.value))}
                 required
               />
             </div>
             <div className="form-group">
-              <label className="form-label">Price per Crate (Rs)</label>
+              <label className="form-label">Price per egg (Rs)</label>
               <input
                 type="number"
                 step="0.01"
-                min="0.1"
+                min="0.01"
                 className="form-control"
-                value={eggPricePerCrate}
-                onChange={e => setEggPricePerCrate(Number(e.target.value))}
+                value={eggPricePerEgg}
+                onChange={e => setEggPricePerEgg(Number(e.target.value))}
                 required
               />
             </div>
@@ -296,7 +389,7 @@ export const EggProduction: React.FC = () => {
             />
           </div>
 
-          {eggCrates > 0 && eggPricePerCrate > 0 && (
+          {eggQty > 0 && eggPricePerEgg > 0 && (
             <div className="sm-order-summary" style={{
               background: 'rgba(16,185,129,0.05)',
               border: '1px solid rgba(16,185,129,0.15)',
@@ -308,12 +401,8 @@ export const EggProduction: React.FC = () => {
               marginTop: '0.5rem'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
-                <span>Crates</span>
-                <strong>{eggCrates.toLocaleString()}</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
                 <span>Eggs Total</span>
-                <strong>{(eggCrates * 30).toLocaleString()} eggs</strong>
+                <strong>{eggQty.toLocaleString()} eggs</strong>
               </div>
               <div style={{
                 display: 'flex',
@@ -326,7 +415,7 @@ export const EggProduction: React.FC = () => {
                 marginTop: '0.2rem'
               }}>
                 <span>Invoice Total</span>
-                <strong>Rs {(eggCrates * eggPricePerCrate).toFixed(2)}</strong>
+                <strong>Rs {(eggQty * eggPricePerEgg).toFixed(2)}</strong>
               </div>
             </div>
           )}

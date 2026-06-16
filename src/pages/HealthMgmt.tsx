@@ -3,11 +3,75 @@ import { useFarm } from '../context/FarmContext';
 import { Modal } from '../components/Modal';
 
 export const HealthMgmt: React.FC = () => {
-  const { batches, vaccines, medicalRecords, addVaccineSchedule, updateVaccineStatus, addMedicalRecord, deleteVaccineSchedule } = useFarm();
+  const { batches, vaccines, medicalRecords, addVaccineSchedule, updateVaccineStatus, addMedicalRecord, deleteVaccineSchedule, updateVaccineSchedule, updateMedicalRecord } = useFarm();
 
-  const [subTab, setSubTab] = useState<'vaccines' | 'medical'>('vaccines');
+  const [subTab, setSubTab] = useState<'vaccines' | 'medical' | 'mortality'>('vaccines');
   const [isVaccineModalOpen, setIsVaccineModalOpen] = useState(false);
   const [isMedicalModalOpen, setIsMedicalModalOpen] = useState(false);
+  
+  // Edit Vaccine States
+  const [isEditVaccineModalOpen, setIsEditVaccineModalOpen] = useState(false);
+  const [editingVaccineId, setEditingVaccineId] = useState('');
+  const [editVaccineName, setEditVaccineName] = useState('');
+  const [editVaccineBatchId, setEditVaccineBatchId] = useState('');
+  const [editVaccineDate, setEditVaccineDate] = useState('');
+  const [editVaccineStatus, setEditVaccineStatus] = useState<any>('Pending');
+
+  const handleOpenEditVaccine = (v: any) => {
+    setEditingVaccineId(v.id);
+    setEditVaccineName(v.vaccineName);
+    setEditVaccineBatchId(v.batchId);
+    setEditVaccineDate(v.scheduledDate);
+    setEditVaccineStatus(v.status);
+    setIsEditVaccineModalOpen(true);
+  };
+
+  const handleEditVaccineSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingVaccineId) return;
+    await updateVaccineSchedule(editingVaccineId, {
+      vaccineName: editVaccineName,
+      batchId: editVaccineBatchId,
+      scheduledDate: editVaccineDate,
+      status: editVaccineStatus
+    });
+    setIsEditVaccineModalOpen(false);
+  };
+
+  // Edit Medical Record States
+  const [isEditMedicalModalOpen, setIsEditMedicalModalOpen] = useState(false);
+  const [editingMedicalId, setEditingMedicalId] = useState('');
+  const [editMedicalDate, setEditMedicalDate] = useState('');
+  const [editMedicalBatchId, setEditMedicalBatchId] = useState('');
+  const [editDisease, setEditDisease] = useState('');
+  const [editMedicine, setEditMedicine] = useState('');
+  const [editDosage, setEditDosage] = useState('');
+  const [editMedicalCost, setEditMedicalCost] = useState<number>(0);
+
+  const handleOpenEditMedical = (m: any) => {
+    setEditingMedicalId(m.id);
+    setEditMedicalDate(m.date);
+    setEditMedicalBatchId(m.batchId);
+    setEditDisease(m.disease);
+    setEditMedicine(m.medicine);
+    setEditDosage(m.dosage);
+    setEditMedicalCost(m.cost);
+    setIsEditMedicalModalOpen(true);
+  };
+
+  const handleEditMedicalSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingMedicalId) return;
+    await updateMedicalRecord(editingMedicalId, {
+      date: editMedicalDate,
+      batchId: editMedicalBatchId,
+      disease: editDisease,
+      medicine: editMedicine,
+      dosage: editDosage,
+      cost: Number(editMedicalCost)
+    });
+    setIsEditMedicalModalOpen(false);
+  };
 
   const [vaccineName, setVaccineName] = useState('Newcastle Disease');
   const [vaccineBatchId, setVaccineBatchId] = useState('');
@@ -91,13 +155,17 @@ export const HealthMgmt: React.FC = () => {
           <button className={`tab-btn ${subTab === 'medical' ? 'active' : ''}`} onClick={() => setSubTab('medical')}>
             💊 Medical Records
           </button>
+          <button className={`tab-btn ${subTab === 'mortality' ? 'active' : ''}`} onClick={() => setSubTab('mortality')}>
+            💀 Mortality Records
+          </button>
         </div>
         <div className="action-buttons-group">
-          {subTab === 'vaccines' ? (
+          {subTab === 'vaccines' && (
             <button className="btn btn-primary" onClick={() => setIsVaccineModalOpen(true)}>
               📅 Schedule Vaccine
             </button>
-          ) : (
+          )}
+          {subTab === 'medical' && (
             <button className="btn btn-primary" onClick={() => setIsMedicalModalOpen(true)}>
               🩺 Add Medical Record
             </button>
@@ -163,6 +231,13 @@ export const HealthMgmt: React.FC = () => {
                             </button>
                           )}
                           <button
+                            type="button"
+                            className="btn btn-secondary btn-xs-custom"
+                            onClick={() => handleOpenEditVaccine(v)}
+                          >
+                            ✏️ Edit
+                          </button>
+                          <button
                             className="btn btn-danger btn-xs-custom"
                             onClick={() => {
                               if (window.confirm(`Are you sure you want to delete the vaccine schedule for "${v.vaccineName}"?`)) {
@@ -212,6 +287,7 @@ export const HealthMgmt: React.FC = () => {
                     <th>Medicine</th>
                     <th>Dosage</th>
                     <th>Cost</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -223,6 +299,15 @@ export const HealthMgmt: React.FC = () => {
                       <td><span className="medicine-tag">💊 {m.medicine}</span></td>
                       <td className="dosage-cell">{m.dosage}</td>
                       <td><strong className="cost-highlight">Rs {m.cost.toFixed(2)}</strong></td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-xs-custom"
+                          onClick={() => handleOpenEditMedical(m)}
+                        >
+                          ✏️ Edit
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -231,6 +316,144 @@ export const HealthMgmt: React.FC = () => {
           )}
         </div>
       )}
+
+      {/* ── Mortality Tab ── */}
+      {subTab === 'mortality' && (() => {
+        const soldBatches = batches.filter(b => b.status === 'Sold');
+        soldBatches.sort((a, b) => new Date(b.arrivalDate).getTime() - new Date(a.arrivalDate).getTime());
+
+        const totalDeadInactive = soldBatches.reduce((sum, b) => sum + b.mortalityLogs.reduce((s, m) => s + m.quantity, 0), 0);
+        const totalInitialInactive = soldBatches.reduce((sum, b) => sum + b.initialQuantity, 0);
+        const avgMortalityRate = totalInitialInactive > 0 ? ((totalDeadInactive / totalInitialInactive) * 100).toFixed(1) : '0.0';
+
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+            {/* Archived Batches Card */}
+            <div className="glass-card">
+              <div className="hm-card-header">
+                <div>
+                  <h3>Archived Bird Batches</h3>
+                  <p className="chart-subtitle">Historical sold/closed batches and their mortality overview</p>
+                </div>
+              </div>
+
+              {soldBatches.length === 0 ? (
+                <div className="hm-empty-state">
+                  <div className="hm-empty-icon">📦</div>
+                  <p>No archived batches found.</p>
+                </div>
+              ) : (
+                <>
+                  {/* Mortality Summary Bar */}
+                  <div className="sold-summary-bar" style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap', paddingBottom: '1rem', borderBottom: '1px solid var(--border-color)', marginBottom: '1rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', minWidth: '120px' }}>
+                      <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>📦 Archived Batches</span>
+                      <span style={{ fontSize: '1.35rem', fontWeight: 800 }}>{soldBatches.length}</span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', minWidth: '120px' }}>
+                      <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>💀 Total Mortality</span>
+                      <span style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--color-rose)' }}>{totalDeadInactive.toLocaleString()} birds</span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', minWidth: '120px' }}>
+                      <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>📈 Avg. Mortality Rate</span>
+                      <span style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--color-amber)' }}>{avgMortalityRate}%</span>
+                    </div>
+                  </div>
+
+                  <div className="table-wrapper">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Batch ID</th>
+                          <th>Type</th>
+                          <th>Arrival Date</th>
+                          <th>Initial Birds</th>
+                          <th>Mortality (💀 count)</th>
+                          <th>Sold / Disposed</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {soldBatches.map(batch => {
+                          const totalDead = batch.mortalityLogs.reduce((sum, m) => sum + m.quantity, 0);
+                          const totalSold = batch.initialQuantity - totalDead;
+
+                          return (
+                            <tr key={batch.id}>
+                              <td><span className="batch-badge">{batch.id}</span></td>
+                              <td>
+                                <span className={`badge ${batch.type === 'Broiler' ? 'badge-amber' : 'badge-emerald'}`}>
+                                  {batch.type}
+                                </span>
+                              </td>
+                              <td>{batch.arrivalDate}</td>
+                              <td>{batch.initialQuantity.toLocaleString()}</td>
+                              <td>
+                                {totalDead > 0 ? (
+                                  <span className="cost-highlight">💀 {totalDead}</span>
+                                ) : '0'}
+                              </td>
+                              <td><strong>{totalSold.toLocaleString()} birds</strong></td>
+                              <td>
+                                <span className="badge badge-secondary" style={{ background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-muted)' }}>
+                                  Archived
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Mortality Audit Logs Card */}
+            <div className="glass-card">
+              <div className="hm-card-header">
+                <div>
+                  <h3>Mortality Audit Records</h3>
+                  <p className="chart-subtitle">Historical death logs for track analysis</p>
+                </div>
+              </div>
+
+              {batches.flatMap(b => b.mortalityLogs).length === 0 ? (
+                <div className="hm-empty-state">
+                  <div className="hm-empty-icon">🛡️</div>
+                  <p>No mortality audits logged. Healthy flock!</p>
+                </div>
+              ) : (
+                <div className="table-wrapper">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Batch ID</th>
+                        <th>Log Date</th>
+                        <th>Quantity</th>
+                        <th>Reason</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {batches
+                        .flatMap(b => b.mortalityLogs.map(m => ({ batchId: b.id, ...m })))
+                        .sort((a, b) => b.date.localeCompare(a.date))
+                        .map((log) => (
+                          <tr key={log.id}>
+                            <td><span className="batch-badge">{log.batchId}</span></td>
+                            <td>{log.date}</td>
+                            <td><span className="cost-highlight">💀 {log.quantity} birds</span></td>
+                            <td>{log.reason}</td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Vaccine Modal ── */}
       <Modal
@@ -354,6 +577,137 @@ export const HealthMgmt: React.FC = () => {
               rows={2}
               value={dosage}
               onChange={e => setDosage(e.target.value)}
+              required
+              style={{ resize: 'vertical' }}
+            />
+          </div>
+        </form>
+      </Modal>
+
+      {/* ── Edit Vaccine Modal ── */}
+      <Modal
+        isOpen={isEditVaccineModalOpen}
+        onClose={() => setIsEditVaccineModalOpen(false)}
+        title="✏️ Edit Vaccine Event"
+        footer={
+          <>
+            <button className="btn btn-secondary" onClick={() => setIsEditVaccineModalOpen(false)}>Cancel</button>
+            <button className="btn btn-primary" onClick={handleEditVaccineSubmit}>Save Changes</button>
+          </>
+        }
+      >
+        <form onSubmit={handleEditVaccineSubmit} className="hm-modal-form">
+          <div className="form-group">
+            <label className="form-label">Vaccine / Disease Target</label>
+            <input
+              type="text"
+              className="form-control"
+              placeholder="e.g. Fowl Pox, Newcastle Lasota"
+              value={editVaccineName}
+              onChange={e => setEditVaccineName(e.target.value)}
+              required
+            />
+          </div>
+          <div className="hm-form-row">
+            <div className="form-group">
+              <label className="form-label">Target Batch</label>
+              <select className="form-control" value={editVaccineBatchId} onChange={e => setEditVaccineBatchId(e.target.value)} required>
+                <option value="">Select active batch...</option>
+                {activeBatches.map(b => (
+                  <option key={b.id} value={b.id}>{b.id} ({b.type} · {b.currentQuantity} birds)</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Scheduled Date</label>
+              <input type="date" className="form-control" value={editVaccineDate} onChange={e => setEditVaccineDate(e.target.value)} required />
+            </div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Status</label>
+            <select className="form-control" value={editVaccineStatus} onChange={e => setEditVaccineStatus(e.target.value as any)}>
+              <option value="Pending">⏳ Pending</option>
+              <option value="Completed">✅ Completed</option>
+            </select>
+          </div>
+        </form>
+      </Modal>
+
+      {/* ── Edit Medical Record Modal ── */}
+      <Modal
+        isOpen={isEditMedicalModalOpen}
+        onClose={() => setIsEditMedicalModalOpen(false)}
+        title="✏️ Edit Medical Record & Remedy"
+        footer={
+          <>
+            <button className="btn btn-secondary" onClick={() => setIsEditMedicalModalOpen(false)}>Cancel</button>
+            <button className="btn btn-primary" onClick={handleEditMedicalSubmit}>Save Changes</button>
+          </>
+        }
+      >
+        <form onSubmit={handleEditMedicalSubmit} className="hm-modal-form">
+          <div className="hm-form-row">
+            <div className="form-group">
+              <label className="form-label">Treatment Date</label>
+              <input type="date" className="form-control" value={editMedicalDate} onChange={e => setEditMedicalDate(e.target.value)} required />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Target Batch</label>
+              <select className="form-control" value={editMedicalBatchId} onChange={e => setEditMedicalBatchId(e.target.value)} required>
+                <option value="">Select batch...</option>
+                {activeBatches.map(b => (
+                  <option key={b.id} value={b.id}>{b.id} ({b.type} · {b.currentQuantity} birds)</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Disease Diagnosed</label>
+            <input
+              type="text"
+              className="form-control"
+              placeholder="e.g. Coccidiosis, Coryza, Bird Flu symptoms"
+              value={editDisease}
+              onChange={e => setEditDisease(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="hm-form-row">
+            <div className="form-group">
+              <label className="form-label">Medicine / Remedy</label>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="e.g. Amprolium, Tylosin"
+                value={editMedicine}
+                onChange={e => setEditMedicine(e.target.value)}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Treatment Cost (Rs)</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                className="form-control"
+                value={editMedicalCost}
+                onChange={e => setEditMedicalCost(Number(e.target.value))}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Dosage & Administration</label>
+            <textarea
+              className="form-control"
+              placeholder="e.g. 5g per gallon of drinking water for 3 days"
+              rows={2}
+              value={editDosage}
+              onChange={e => setEditDosage(e.target.value)}
               required
               style={{ resize: 'vertical' }}
             />

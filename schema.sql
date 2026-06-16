@@ -11,7 +11,9 @@ CREATE TABLE IF NOT EXISTS batches (
     initial_quantity INTEGER NOT NULL,
     current_quantity INTEGER NOT NULL,
     purchase_price NUMERIC NOT NULL,
-    status TEXT CHECK (status IN ('Active', 'Sold')) DEFAULT 'Active' NOT NULL
+    status TEXT CHECK (status IN ('Active', 'Sold')) DEFAULT 'Active' NOT NULL,
+    initial_quantity_kg NUMERIC,
+    purchase_price_per_kg NUMERIC
 );
 
 -- 2. Mortality Logs Table
@@ -135,3 +137,10 @@ ALTER PUBLICATION supabase_realtime ADD TABLE medical_records;
 ALTER PUBLICATION supabase_realtime ADD TABLE egg_collections;
 ALTER PUBLICATION supabase_realtime ADD TABLE sales;
 ALTER PUBLICATION supabase_realtime ADD TABLE expenses;
+
+-- =========================================================================
+-- DATABASE MIGRATIONS (For existing databases)
+-- =========================================================================
+ALTER TABLE batches ADD COLUMN IF NOT EXISTS initial_quantity_kg NUMERIC;
+ALTER TABLE batches ADD COLUMN IF NOT EXISTS purchase_price_per_kg NUMERIC;
+

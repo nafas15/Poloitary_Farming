@@ -88,7 +88,7 @@ export const Dashboard: React.FC = () => {
   sales.slice(0, 3).forEach(s => {
     recentActivities.push({
       id: s.id,
-      text: `Sale: ${s.quantity} ${s.type === 'Bird' ? 'birds' : 'crates of eggs'} to ${s.customerName}`,
+      text: `Sale: ${s.quantity.toLocaleString()} ${s.type === 'Bird' ? 'birds' : 'eggs'} to ${s.customerName}`,
       date: s.date,
       type: 'sale'
     });
