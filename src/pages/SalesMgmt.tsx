@@ -8,6 +8,10 @@ export const SalesMgmt: React.FC = () => {
 
   const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
   const [activeInvoice, setActiveInvoice] = useState<Sale | null>(null);
+  const [amountPaid, setAmountPaid] = useState<number>(0);
+  const [extraCharges, setExtraCharges] = useState<{ label: string; amount: number }[]>([]);
+  const [newChargeLabel, setNewChargeLabel] = useState('Transport');
+  const [newChargeAmount, setNewChargeAmount] = useState<number>(0);
   const [ledgerFilter, setLedgerFilter] = useState<'All' | 'Bird' | 'Egg'>('All');
 
   // Edit Sale States
@@ -54,6 +58,10 @@ export const SalesMgmt: React.FC = () => {
 
   const handleViewInvoice = (sale: Sale) => {
     setActiveInvoice(sale);
+    setAmountPaid(sale.totalAmount); // default to exact amount
+    setExtraCharges([]);
+    setNewChargeLabel('Transport');
+    setNewChargeAmount(0);
     setIsInvoiceOpen(true);
   };
 
@@ -359,7 +367,7 @@ export const SalesMgmt: React.FC = () => {
               <div>
                 <h2>AKSHA FARM ERP</h2>
                 <p className="inv-subtitle">Premium Poultry Farm Management</p>
-                <p className="inv-address">128 Green Valley Farm Rd, Agriculture Zone</p>
+                <p className="inv-address">Kekunagoll, Kurunegala</p>
               </div>
               <div className="invoice-id-block">
                 <div className="invoice-label">INVOICE</div>
@@ -375,8 +383,24 @@ export const SalesMgmt: React.FC = () => {
                 <p className="inv-contact">📞 {activeInvoice.customerContact}</p>
               </div>
               <div className="address-block invoice-status-block">
-                <h5>Payment Status</h5>
-                <span className="paid-badge">✅ PAID IN FULL</span>
+                <h5>Amount Paid (Rs)</h5>
+                <input
+                  id="amountPaidInput"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  className="inv-paid-input inv-paid-input-header"
+                  value={amountPaid}
+                  onChange={e => setAmountPaid(Number(e.target.value))}
+                />
+                <span className="inv-paid-print-value">Rs {amountPaid.toFixed(2)}</span>
+                <div style={{ marginTop: '0.4rem' }}>
+                  {amountPaid >= (activeInvoice?.totalAmount ?? 0) ? (
+                    <span className="paid-badge">✅ PAID IN FULL</span>
+                  ) : (
+                    <span className="partial-badge">⏳ PARTIAL PAYMENT</span>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -410,8 +434,94 @@ export const SalesMgmt: React.FC = () => {
 
             <div className="invoice-calculations">
               <div className="calc-row"><span>Subtotal:</span><span>Rs {activeInvoice.totalAmount.toFixed(2)}</span></div>
-              <div className="calc-row"><span>Tax (0%):</span><span>Rs 0.00</span></div>
-              <div className="calc-row grand-total"><span>Grand Total:</span><span>Rs {activeInvoice.totalAmount.toFixed(2)}</span></div>
+
+              {/* ── Extra Charges ── */}
+              {extraCharges.map((c, i) => (
+                <div key={i} className="calc-row extra-charge-row">
+                  <span>+ {c.label}:</span>
+                  <span className="extra-charge-right">
+                    Rs {c.amount.toFixed(2)}
+                    <button
+                      type="button"
+                      className="remove-charge-btn"
+                      onClick={() => {
+                        const updated = extraCharges.filter((_, idx) => idx !== i);
+                        setExtraCharges(updated);
+                        const newGrandTotal = (activeInvoice?.totalAmount ?? 0) + updated.reduce((s, x) => s + x.amount, 0);
+                        setAmountPaid(newGrandTotal);
+                      }}
+                      title="Remove charge"
+                    >✕</button>
+                  </span>
+                </div>
+              ))}
+
+              {/* ── Add Charge Row ── */}
+              <div className="add-charge-row">
+                <select
+                  className="charge-label-select"
+                  value={newChargeLabel}
+                  onChange={e => setNewChargeLabel(e.target.value)}
+                >
+                  <option>Transport</option>
+                  <option>Packing</option>
+                  <option>Loading</option>
+                  <option>Handling</option>
+                  <option>Discount</option>
+                  <option>Other</option>
+                </select>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  className="charge-amount-input"
+                  placeholder="Amount"
+                  value={newChargeAmount === 0 ? '' : newChargeAmount}
+                  onChange={e => setNewChargeAmount(Number(e.target.value))}
+                />
+                <button
+                  type="button"
+                  className="add-charge-btn"
+                  onClick={() => {
+                    if (newChargeAmount > 0) {
+                      const newCharge = { label: newChargeLabel, amount: newChargeAmount };
+                      const updated = [...extraCharges, newCharge];
+                      setExtraCharges(updated);
+                      const newGrandTotal = (activeInvoice?.totalAmount ?? 0) + updated.reduce((s, c) => s + c.amount, 0);
+                      setAmountPaid(newGrandTotal);
+                      setNewChargeAmount(0);
+                    }
+                  }}
+                >+ Add</button>
+              </div>
+
+              {/* ── Grand Total ── */}
+              {(() => {
+                const totalExtras = extraCharges.reduce((s, c) => s + c.amount, 0);
+                const grandTotal = activeInvoice.totalAmount + totalExtras;
+                const change = amountPaid - grandTotal;
+                return (
+                  <>
+                    <div className="calc-row grand-total"><span>Grand Total:</span><span>Rs {grandTotal.toFixed(2)}</span></div>
+                    {/* ── Balance Section ── */}
+                    <div className="calc-row payment-given-row">
+                      <span>Payment Given:</span>
+                      <span>Rs {amountPaid.toFixed(2)}</span>
+                    </div>
+                    {change >= 0 ? (
+                      <div className="calc-row balance-row change-positive">
+                        <span>Change to Return:</span>
+                        <span>Rs {change.toFixed(2)}</span>
+                      </div>
+                    ) : (
+                      <div className="calc-row balance-row balance-due">
+                        <span>Balance Due:</span>
+                        <span>Rs {(-change).toFixed(2)}</span>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
 
             <div className="invoice-footer-notes">
@@ -602,6 +712,31 @@ export const SalesMgmt: React.FC = () => {
           color: var(--color-emerald); padding: 0.3rem 0.75rem; border-radius: 999px;
           font-size: 0.8rem; font-weight: 700;
         }
+        .partial-badge {
+          background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.25);
+          color: var(--color-amber); padding: 0.3rem 0.75rem; border-radius: 999px;
+          font-size: 0.8rem; font-weight: 700;
+        }
+        .inv-paid-input {
+          width: 110px; padding: 0.25rem 0.5rem; font-size: 0.88rem; font-weight: 600;
+          background: rgba(255,255,255,0.06); border: 1px solid var(--border-color-hover);
+          border-radius: var(--radius-sm); color: var(--text-primary);
+          text-align: right; font-family: var(--font-family);
+        }
+        .inv-paid-input-header {
+          width: auto; max-width: 140px; font-size: 0.9rem; padding: 0.3rem 0.5rem; text-align: right;
+          border-color: rgba(16,185,129,0.3); display: block;
+        }
+        .inv-paid-input-header:focus { border-color: var(--color-emerald); }
+        .inv-paid-input:focus { outline: none; border-color: var(--color-emerald); }
+        .payment-input-row { align-items: center; margin-top: 0.5rem; }
+        .balance-row { font-size: 1rem; font-weight: 700; border-top: 1px solid var(--border-color-hover); padding-top: 0.5rem; margin-top: 0.15rem; }
+        .change-positive { color: var(--color-emerald); }
+        .balance-due { color: var(--color-rose); }
+        .payment-given-row {
+          color: var(--color-amber); font-weight: 600;
+          border-top: 1px dashed rgba(245,158,11,0.25); padding-top: 0.4rem; margin-top: 0.1rem;
+        }
 
         .invoice-items-table { width: 100%; border-collapse: collapse; margin-bottom: var(--spacing-xl); }
         .invoice-items-table th { border-bottom: 1px solid var(--border-color-hover); padding-bottom: 0.5rem; font-size: 0.75rem; color: var(--text-secondary); text-align: left; }
@@ -610,7 +745,7 @@ export const SalesMgmt: React.FC = () => {
         .inv-item-note { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; }
 
         .invoice-calculations {
-          margin-left: auto; width: 260px;
+          margin-left: auto; width: 320px;
           border-top: 1px solid var(--border-color-hover); padding-top: var(--spacing-md);
           margin-bottom: var(--spacing-xl); display: flex; flex-direction: column; gap: 0.4rem;
         }
@@ -620,10 +755,64 @@ export const SalesMgmt: React.FC = () => {
           border-top: 1px solid var(--border-color-hover); padding-top: 0.5rem; margin-top: 0.25rem;
         }
 
+
+        /* Extra charge rows */
+        .extra-charge-row { color: #38bdf8; }
+        .extra-charge-right { display: flex; align-items: center; gap: 0.35rem; }
+        .remove-charge-btn {
+          background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.2);
+          color: var(--color-rose); border-radius: 50%; width: 1.1rem; height: 1.1rem;
+          font-size: 0.55rem; cursor: pointer; display: flex; align-items: center;
+          justify-content: center; padding: 0; line-height: 1; flex-shrink: 0;
+          transition: background var(--transition-fast);
+        }
+        .remove-charge-btn:hover { background: rgba(239,68,68,0.25); }
+
+        /* Add charge form row */
+        .add-charge-row {
+          display: flex; align-items: center; gap: 0.3rem; margin-top: 0.25rem;
+          padding: 0.4rem 0.5rem;
+          background: rgba(255,255,255,0.03);
+          border: 1px dashed var(--border-color);
+          border-radius: var(--radius-sm);
+        }
+        .charge-label-select {
+          flex: 1; background: #1e2a3a; border: 1px solid var(--border-color-hover);
+          border-radius: var(--radius-sm); color: #e2e8f0;
+          font-family: var(--font-family); font-size: 0.75rem; padding: 0.25rem 0.35rem;
+          appearance: auto; -webkit-appearance: auto;
+        }
+        .charge-label-select option {
+          background: #1e2a3a; color: #e2e8f0;
+        }
+        .charge-amount-input {
+          width: 72px; background: #1e2a3a; border: 1px solid var(--border-color-hover);
+          border-radius: var(--radius-sm); color: #e2e8f0;
+          font-family: var(--font-family); font-size: 0.75rem; padding: 0.25rem 0.35rem;
+          text-align: right;
+        }
+        .charge-label-select:focus, .charge-amount-input:focus { outline: none; border-color: var(--color-emerald); }
+        .add-charge-btn {
+          background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3);
+          color: var(--color-emerald); border-radius: var(--radius-sm);
+          font-size: 0.72rem; font-weight: 700; padding: 0.25rem 0.5rem;
+          cursor: pointer; white-space: nowrap; font-family: var(--font-family);
+          transition: background var(--transition-fast);
+        }
+        .add-charge-btn:hover { background: rgba(16,185,129,0.25); }
+
         .invoice-footer-notes {
           text-align: center; font-size: 0.78rem; color: var(--text-muted);
           border-top: 1px solid var(--border-color); padding-top: var(--spacing-md);
         }
+
+        @media print {
+          .add-charge-row { display: none !important; }
+          .remove-charge-btn { display: none !important; }
+          .inv-paid-input-header { display: none !important; }
+          .inv-paid-print-value { display: block !important; }
+        }
+        .inv-paid-print-value { display: none; font-size: 0.95rem; font-weight: 700; color: #e2e8f0; }
       `}</style>
     </div>
   );
