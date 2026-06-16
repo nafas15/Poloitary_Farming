@@ -158,8 +158,23 @@ const FarmContext = createContext<FarmContextType | undefined>(undefined);
 export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Session User (Kept in LocalStorage for dev auth simplicity)
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('poultry_user');
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem('poultry_user');
+      if (!saved) return null;
+      const parsed = JSON.parse(saved);
+      // Validate shape to guard against tampered storage
+      if (
+        parsed &&
+        typeof parsed.username === 'string' &&
+        (parsed.role === 'Admin' || parsed.role === 'Employee')
+      ) {
+        return parsed as User;
+      }
+      return null;
+    } catch {
+      localStorage.removeItem('poultry_user');
+      return null;
+    }
   });
 
   // Core Farm States
@@ -311,7 +326,11 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Sync session user
   useEffect(() => {
-    localStorage.setItem('poultry_user', currentUser ? JSON.stringify(currentUser) : '');
+    if (currentUser) {
+      localStorage.setItem('poultry_user', JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem('poultry_user');
+    }
   }, [currentUser]);
 
   // Load initial data and subscribe to realtime updates
@@ -342,11 +361,16 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Authentication (Local Session storage)
   const login = (username: string, role: UserRole): boolean => {
+    // Validate that the username is a non-empty string and role is an allowed value
+    const trimmed = username.trim();
+    if (!trimmed || trimmed.length > 64) return false;
+    if (role !== 'Admin' && role !== 'Employee') return false;
+
     if (
-      (role === 'Admin' && username.toLowerCase() === 'admin') ||
-      (role === 'Employee' && username.toLowerCase() === 'employee')
+      (role === 'Admin' && trimmed.toLowerCase() === 'admin') ||
+      (role === 'Employee' && trimmed.toLowerCase() === 'employee')
     ) {
-      setCurrentUser({ username, role });
+      setCurrentUser({ username: trimmed, role });
       return true;
     }
     return false;

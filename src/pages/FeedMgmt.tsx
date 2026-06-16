@@ -418,7 +418,7 @@ export const FeedMgmt: React.FC = () => {
           </div>
           <div className="form-group">
             <label className="form-label">Vendor / Supplier Name</label>
-            <input type="text" className="form-control" placeholder="e.g. AgriFeeds Ltd." value={purchaseVendor} onChange={e => setPurchaseVendor(e.target.value)} required />
+            <input type="text" className="form-control" placeholder="e.g. AgriFeeds Ltd." value={purchaseVendor} onChange={e => setPurchaseVendor(e.target.value)} maxLength={128} required />
           </div>
           {purchaseQty > 0 && purchaseCost > 0 && (
             <div className="form-preview-pill">
@@ -519,7 +519,7 @@ export const FeedMgmt: React.FC = () => {
           </div>
           <div className="form-group">
             <label className="form-label">Vendor / Supplier Name</label>
-            <input type="text" className="form-control" placeholder="e.g. AgriFeeds Ltd." value={editPurchaseVendor} onChange={e => setEditPurchaseVendor(e.target.value)} required />
+            <input type="text" className="form-control" placeholder="e.g. AgriFeeds Ltd." value={editPurchaseVendor} onChange={e => setEditPurchaseVendor(e.target.value)} maxLength={128} required />
           </div>
           {editPurchaseQty > 0 && editPurchaseCost > 0 && (
             <div className="form-preview-pill">

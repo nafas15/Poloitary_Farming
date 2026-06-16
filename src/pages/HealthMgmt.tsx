@@ -476,6 +476,7 @@ export const HealthMgmt: React.FC = () => {
               placeholder="e.g. Fowl Pox, Newcastle Lasota"
               value={vaccineName}
               onChange={e => setVaccineName(e.target.value)}
+              maxLength={128}
               required
             />
           </div>
@@ -539,6 +540,7 @@ export const HealthMgmt: React.FC = () => {
               placeholder="e.g. Coccidiosis, Coryza, Bird Flu symptoms"
               value={disease}
               onChange={e => setDisease(e.target.value)}
+              maxLength={128}
               required
             />
           </div>
@@ -552,6 +554,7 @@ export const HealthMgmt: React.FC = () => {
                 placeholder="e.g. Amprolium, Tylosin"
                 value={medicine}
                 onChange={e => setMedicine(e.target.value)}
+                maxLength={128}
                 required
               />
             </div>
@@ -577,6 +580,7 @@ export const HealthMgmt: React.FC = () => {
               rows={2}
               value={dosage}
               onChange={e => setDosage(e.target.value)}
+              maxLength={256}
               required
               style={{ resize: 'vertical' }}
             />
@@ -605,6 +609,7 @@ export const HealthMgmt: React.FC = () => {
               placeholder="e.g. Fowl Pox, Newcastle Lasota"
               value={editVaccineName}
               onChange={e => setEditVaccineName(e.target.value)}
+              maxLength={128}
               required
             />
           </div>
@@ -670,6 +675,7 @@ export const HealthMgmt: React.FC = () => {
               placeholder="e.g. Coccidiosis, Coryza, Bird Flu symptoms"
               value={editDisease}
               onChange={e => setEditDisease(e.target.value)}
+              maxLength={128}
               required
             />
           </div>
@@ -683,6 +689,7 @@ export const HealthMgmt: React.FC = () => {
                 placeholder="e.g. Amprolium, Tylosin"
                 value={editMedicine}
                 onChange={e => setEditMedicine(e.target.value)}
+                maxLength={128}
                 required
               />
             </div>
@@ -708,6 +715,7 @@ export const HealthMgmt: React.FC = () => {
               rows={2}
               value={editDosage}
               onChange={e => setEditDosage(e.target.value)}
+              maxLength={256}
               required
               style={{ resize: 'vertical' }}
             />

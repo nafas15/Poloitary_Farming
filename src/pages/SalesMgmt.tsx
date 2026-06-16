@@ -285,11 +285,11 @@ export const SalesMgmt: React.FC = () => {
           <div className="form-row">
             <div className="form-group">
               <label className="form-label">Customer Name</label>
-              <input type="text" className="form-control" value={editSaleCustomerName} onChange={e => setEditSaleCustomerName(e.target.value)} required />
+              <input type="text" className="form-control" value={editSaleCustomerName} onChange={e => setEditSaleCustomerName(e.target.value)} maxLength={128} required />
             </div>
             <div className="form-group">
               <label className="form-label">Customer Contact</label>
-              <input type="text" className="form-control" value={editSaleCustomerContact} onChange={e => setEditSaleCustomerContact(e.target.value)} required />
+              <input type="text" className="form-control" value={editSaleCustomerContact} onChange={e => setEditSaleCustomerContact(e.target.value)} maxLength={32} required />
             </div>
           </div>
 
@@ -318,7 +318,7 @@ export const SalesMgmt: React.FC = () => {
 
           <div className="form-group">
             <label className="form-label">Details / Remarks</label>
-            <input type="text" className="form-control" value={editSaleDetails} onChange={e => setEditSaleDetails(e.target.value)} />
+            <input type="text" className="form-control" value={editSaleDetails} onChange={e => setEditSaleDetails(e.target.value)} maxLength={256} />
           </div>
 
           {editSaleQty > 0 && editSaleUnitPrice > 0 && (

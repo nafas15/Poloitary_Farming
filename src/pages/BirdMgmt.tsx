@@ -658,6 +658,7 @@ export const BirdMgmt: React.FC = () => {
                 placeholder="e.g. Fresh Meats Co."
                 value={sellCustomer}
                 onChange={e => setSellCustomer(e.target.value)}
+                maxLength={128}
                 required
               />
             </div>
@@ -669,6 +670,7 @@ export const BirdMgmt: React.FC = () => {
                 placeholder="e.g. +91 98765 43210"
                 value={sellContact}
                 onChange={e => setSellContact(e.target.value)}
+                maxLength={32}
                 required
               />
             </div>
@@ -762,6 +764,7 @@ export const BirdMgmt: React.FC = () => {
               rows={3}
               value={mortalityReason}
               onChange={e => setMortalityReason(e.target.value)}
+              maxLength={500}
               required
               style={{ resize: 'vertical' }}
             ></textarea>
