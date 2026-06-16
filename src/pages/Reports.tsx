@@ -240,7 +240,7 @@ export const Reports: React.FC = () => {
                   <td>{s.date}</td>
                   <td><b>{s.type} Sale</b> ({s.customerName})</td>
                   <td><span className="badge badge-emerald">Revenue Income</span></td>
-                  <td>{s.quantity.toLocaleString()} {s.type === 'Bird' ? 'birds' : 'crates'}</td>
+                  <td>{s.quantity.toLocaleString()} {s.type === 'Bird' ? 'birds' : 'eggs'}</td>
                   <td className="color-emerald" style={{ textAlign: 'right' }}><b>+Rs {s.totalAmount.toFixed(2)}</b></td>
                 </tr>
               ))}

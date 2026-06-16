@@ -4,11 +4,53 @@ import type { Sale } from '../context/FarmContext';
 import { Modal } from '../components/Modal';
 
 export const SalesMgmt: React.FC = () => {
-  const { batches, sales, deleteSale } = useFarm();
+  const { batches, sales, deleteSale, updateSale } = useFarm();
 
   const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
   const [activeInvoice, setActiveInvoice] = useState<Sale | null>(null);
   const [ledgerFilter, setLedgerFilter] = useState<'All' | 'Bird' | 'Egg'>('All');
+
+  // Edit Sale States
+  const [isEditSaleModalOpen, setIsEditSaleModalOpen] = useState(false);
+  const [editingSaleId, setEditingSaleId] = useState('');
+  const [editSaleType, setEditSaleType] = useState<'Bird' | 'Egg'>('Bird');
+  const [editSaleDate, setEditSaleDate] = useState('');
+  const [editSaleCustomerName, setEditSaleCustomerName] = useState('');
+  const [editSaleCustomerContact, setEditSaleCustomerContact] = useState('');
+  const [editSaleQty, setEditSaleQty] = useState<number>(0);
+  const [editSaleUnitPrice, setEditSaleUnitPrice] = useState<number>(0);
+  const [editSaleBatchId, setEditSaleBatchId] = useState('');
+  const [editSaleDetails, setEditSaleDetails] = useState('');
+
+  const handleOpenEditSale = (s: Sale) => {
+    setEditingSaleId(s.id);
+    setEditSaleType(s.type);
+    setEditSaleDate(s.date);
+    setEditSaleCustomerName(s.customerName);
+    setEditSaleCustomerContact(s.customerContact);
+    setEditSaleQty(s.quantity);
+    setEditSaleUnitPrice(s.unitPrice);
+    setEditSaleBatchId(s.batchId || '');
+    setEditSaleDetails(s.details || '');
+    setIsEditSaleModalOpen(true);
+  };
+
+  const handleEditSaleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSaleId) return;
+    await updateSale(editingSaleId, {
+      type: editSaleType,
+      date: editSaleDate,
+      customerName: editSaleCustomerName,
+      customerContact: editSaleCustomerContact,
+      quantity: Number(editSaleQty),
+      unitPrice: Number(editSaleUnitPrice),
+      totalAmount: Number(editSaleQty) * Number(editSaleUnitPrice),
+      batchId: editSaleType === 'Bird' ? editSaleBatchId : undefined,
+      details: editSaleDetails
+    });
+    setIsEditSaleModalOpen(false);
+  };
 
   const handleViewInvoice = (sale: Sale) => {
     setActiveInvoice(sale);
@@ -169,7 +211,7 @@ export const SalesMgmt: React.FC = () => {
                               {s.type === 'Bird' ? '🐔 Bird' : '🥚 Egg'}
                             </span>
                           </td>
-                          <td>{s.quantity.toLocaleString()} {s.type === 'Bird' ? 'birds' : 'crates'}</td>
+                          <td>{s.quantity.toLocaleString()} {s.type === 'Bird' ? 'birds' : 'eggs'}</td>
                           <td>Rs {s.unitPrice.toFixed(2)}</td>
                           <td><strong className="revenue-amount">Rs {s.totalAmount.toFixed(2)}</strong></td>
                           <td>
@@ -181,6 +223,13 @@ export const SalesMgmt: React.FC = () => {
                             <div style={{ display: 'flex', gap: '0.4rem' }}>
                               <button type="button" className="btn btn-secondary btn-xs-custom" onClick={() => handleViewInvoice(s)}>
                                 👁️ Invoice
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-xs-custom"
+                                onClick={() => handleOpenEditSale(s)}
+                              >
+                                ✏️ Edit
                               </button>
                               <button 
                                 type="button"
@@ -205,6 +254,92 @@ export const SalesMgmt: React.FC = () => {
           </>
         )}
       </div>
+
+      {/* ── Edit Sale Modal ── */}
+      <Modal
+        isOpen={isEditSaleModalOpen}
+        onClose={() => setIsEditSaleModalOpen(false)}
+        title={`✏️ Edit Sale Invoice: ${sales.find(s => s.id === editingSaleId)?.invoiceId || ''}`}
+        footer={
+          <>
+            <button className="btn btn-secondary" onClick={() => setIsEditSaleModalOpen(false)}>Cancel</button>
+            <button className="btn btn-primary" onClick={handleEditSaleSubmit}>Save Changes</button>
+          </>
+        }
+      >
+        <form onSubmit={handleEditSaleSubmit} className="modal-form-grid">
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Sale Date</label>
+              <input type="date" className="form-control" value={editSaleDate} onChange={e => setEditSaleDate(e.target.value)} required />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Sale Type</label>
+              <select className="form-control" value={editSaleType} onChange={e => setEditSaleType(e.target.value as 'Bird' | 'Egg')}>
+                <option value="Bird">🐔 Bird Sale</option>
+                <option value="Egg">🥚 Egg Sale</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Customer Name</label>
+              <input type="text" className="form-control" value={editSaleCustomerName} onChange={e => setEditSaleCustomerName(e.target.value)} required />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Customer Contact</label>
+              <input type="text" className="form-control" value={editSaleCustomerContact} onChange={e => setEditSaleCustomerContact(e.target.value)} required />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Quantity ({editSaleType === 'Bird' ? 'birds' : 'eggs'})</label>
+              <input type="number" min="1" className="form-control" value={editSaleQty} onChange={e => setEditSaleQty(Number(e.target.value))} required />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Price per {editSaleType === 'Bird' ? 'Bird' : 'Egg'} (Rs)</label>
+              <input type="number" step="0.01" min="0.01" className="form-control" value={editSaleUnitPrice} onChange={e => setEditSaleUnitPrice(Number(e.target.value))} required />
+            </div>
+          </div>
+
+          {editSaleType === 'Bird' && (
+            <div className="form-group">
+              <label className="form-label">Target Batch ID</label>
+              <select className="form-control" value={editSaleBatchId} onChange={e => setEditSaleBatchId(e.target.value)} required>
+                <option value="">Select active batch...</option>
+                {batches.filter(b => b.status === 'Active').map(b => (
+                  <option key={b.id} value={b.id}>{b.id} — {b.type} ({b.currentQuantity.toLocaleString()} birds available)</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="form-group">
+            <label className="form-label">Details / Remarks</label>
+            <input type="text" className="form-control" value={editSaleDetails} onChange={e => setEditSaleDetails(e.target.value)} />
+          </div>
+
+          {editSaleQty > 0 && editSaleUnitPrice > 0 && (
+            <div className="sm-order-summary" style={{
+              background: 'rgba(16,185,129,0.05)',
+              border: '1px solid rgba(16,185,129,0.15)',
+              borderRadius: 'var(--radius-md)',
+              padding: 'var(--spacing-md) var(--spacing-lg)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.4rem',
+              marginTop: '0.5rem'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
+                <span>Subtotal</span>
+                <strong>Rs {(editSaleQty * editSaleUnitPrice).toFixed(2)}</strong>
+              </div>
+            </div>
+          )}
+        </form>
+      </Modal>
 
       {/* ── Invoice Viewer Modal ── */}
       <Modal
@@ -260,13 +395,13 @@ export const SalesMgmt: React.FC = () => {
                     <div className="inv-item-desc">
                       {activeInvoice.type === 'Bird'
                         ? `Live Poultry Birds (Batch: ${activeInvoice.batchId})`
-                        : 'Fresh Eggs — Crates of 30 eggs'}
+                        : 'Fresh Eggs'}
                     </div>
                     {activeInvoice.details && (
                       <div className="inv-item-note">{activeInvoice.details}</div>
                     )}
                   </td>
-                  <td>{activeInvoice.quantity.toLocaleString()} {activeInvoice.type === 'Bird' ? 'birds' : 'crates'}</td>
+                  <td>{activeInvoice.quantity.toLocaleString()} {activeInvoice.type === 'Bird' ? 'birds' : 'eggs'}</td>
                   <td>Rs {activeInvoice.unitPrice.toFixed(2)}</td>
                   <td><strong>Rs {activeInvoice.totalAmount.toFixed(2)}</strong></td>
                 </tr>

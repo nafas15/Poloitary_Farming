@@ -4,11 +4,72 @@ import type { FeedType } from '../context/FarmContext';
 import { Modal } from '../components/Modal';
 
 export const FeedMgmt: React.FC = () => {
-  const { batches, feedPurchases, feedConsumption, addFeedPurchase, addFeedConsumption, getFeedStock } = useFarm();
+  const { batches, feedPurchases, feedConsumption, addFeedPurchase, addFeedConsumption, getFeedStock, updateFeedPurchase, updateFeedConsumption } = useFarm();
 
   const [subTab, setSubTab] = useState<'inventory' | 'purchases' | 'consumption'>('inventory');
   const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
   const [isConsumptionModalOpen, setIsConsumptionModalOpen] = useState(false);
+  
+  // Edit Purchase States
+  const [isEditPurchaseModalOpen, setIsEditPurchaseModalOpen] = useState(false);
+  const [editingPurchaseId, setEditingPurchaseId] = useState('');
+  const [editPurchaseType, setEditPurchaseType] = useState<FeedType>('Starter');
+  const [editPurchaseQty, setEditPurchaseQty] = useState<number>(500);
+  const [editPurchaseCost, setEditPurchaseCost] = useState<number>(250);
+  const [editPurchaseVendor, setEditPurchaseVendor] = useState('');
+  const [editPurchaseDate, setEditPurchaseDate] = useState('');
+
+  const handleOpenEditPurchase = (fp: any) => {
+    setEditingPurchaseId(fp.id);
+    setEditPurchaseType(fp.feedType);
+    setEditPurchaseQty(fp.quantityKg);
+    setEditPurchaseCost(fp.cost);
+    setEditPurchaseVendor(fp.vendor);
+    setEditPurchaseDate(fp.date);
+    setIsEditPurchaseModalOpen(true);
+  };
+
+  const handleEditPurchaseSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPurchaseId) return;
+    await updateFeedPurchase(editingPurchaseId, {
+      date: editPurchaseDate,
+      feedType: editPurchaseType,
+      quantityKg: Number(editPurchaseQty),
+      cost: Number(editPurchaseCost),
+      vendor: editPurchaseVendor
+    });
+    setIsEditPurchaseModalOpen(false);
+  };
+
+  // Edit Consumption States
+  const [isEditConsumptionModalOpen, setIsEditConsumptionModalOpen] = useState(false);
+  const [editingConsumptionId, setEditingConsumptionId] = useState('');
+  const [editConsumptionType, setEditConsumptionType] = useState<FeedType>('Starter');
+  const [editConsumptionBatchId, setEditConsumptionBatchId] = useState('');
+  const [editConsumptionQty, setEditConsumptionQty] = useState<number>(50);
+  const [editConsumptionDate, setEditConsumptionDate] = useState('');
+
+  const handleOpenEditConsumption = (fc: any) => {
+    setEditingConsumptionId(fc.id);
+    setEditConsumptionType(fc.feedType);
+    setEditConsumptionBatchId(fc.batchId);
+    setEditConsumptionQty(fc.quantityKg);
+    setEditConsumptionDate(fc.date);
+    setIsEditConsumptionModalOpen(true);
+  };
+
+  const handleEditConsumptionSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingConsumptionId) return;
+    await updateFeedConsumption(editingConsumptionId, {
+      date: editConsumptionDate,
+      feedType: editConsumptionType,
+      batchId: editConsumptionBatchId,
+      quantityKg: Number(editConsumptionQty)
+    });
+    setIsEditConsumptionModalOpen(false);
+  };
 
   const [purchaseType, setPurchaseType] = useState<FeedType>('Starter');
   const [purchaseQty, setPurchaseQty] = useState<number>(500);
@@ -210,6 +271,7 @@ export const FeedMgmt: React.FC = () => {
                   <th>Vendor</th>
                   <th>Unit Cost</th>
                   <th>Total Cost</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -237,6 +299,15 @@ export const FeedMgmt: React.FC = () => {
                       <td>{fp.vendor}</td>
                       <td>Rs {(fp.cost / fp.quantityKg).toFixed(2)}/kg</td>
                       <td><strong className="color-emerald">Rs {fp.cost.toFixed(2)}</strong></td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm-custom"
+                          onClick={() => handleOpenEditPurchase(fp)}
+                        >
+                          ✏️ Edit
+                        </button>
+                      </td>
                     </tr>
                   ))
                 )}
@@ -263,6 +334,7 @@ export const FeedMgmt: React.FC = () => {
                   <th>Feed Type</th>
                   <th>Batch ID</th>
                   <th>Quantity Consumed</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -288,6 +360,15 @@ export const FeedMgmt: React.FC = () => {
                       </td>
                       <td><span className="batch-badge">{fc.batchId}</span></td>
                       <td><strong>{fc.quantityKg.toLocaleString()} kg</strong></td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm-custom"
+                          onClick={() => handleOpenEditConsumption(fc)}
+                        >
+                          ✏️ Edit
+                        </button>
+                      </td>
                     </tr>
                   ))
                 )}
@@ -398,6 +479,107 @@ export const FeedMgmt: React.FC = () => {
         </form>
       </Modal>
 
+      {/* ── Edit Purchase Modal ── */}
+      <Modal
+        isOpen={isEditPurchaseModalOpen}
+        onClose={() => setIsEditPurchaseModalOpen(false)}
+        title="✏️ Edit Feed Purchase"
+        footer={
+          <>
+            <button className="btn btn-secondary" onClick={() => setIsEditPurchaseModalOpen(false)}>Cancel</button>
+            <button className="btn btn-primary" onClick={handleEditPurchaseSubmit}>Save Changes</button>
+          </>
+        }
+      >
+        <form onSubmit={handleEditPurchaseSubmit} className="modal-form-grid">
+          <div className="fm-form-row">
+            <div className="form-group">
+              <label className="form-label">Purchase Date</label>
+              <input type="date" className="form-control" value={editPurchaseDate} onChange={e => setEditPurchaseDate(e.target.value)} required />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Feed Type</label>
+              <select className="form-control" value={editPurchaseType} onChange={e => setEditPurchaseType(e.target.value as FeedType)}>
+                <option value="Starter">🐣 Starter</option>
+                <option value="Grower">🌱 Grower</option>
+                <option value="Finisher">🏁 Finisher</option>
+                <option value="Layer Mash">🥚 Layer Mash</option>
+              </select>
+            </div>
+          </div>
+          <div className="fm-form-row">
+            <div className="form-group">
+              <label className="form-label">Quantity (kg)</label>
+              <input type="number" min="1" className="form-control" value={editPurchaseQty} onChange={e => setEditPurchaseQty(Number(e.target.value))} required />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Total Cost (Rs)</label>
+              <input type="number" step="0.01" className="form-control" value={editPurchaseCost} onChange={e => setEditPurchaseCost(Number(e.target.value))} required />
+            </div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Vendor / Supplier Name</label>
+            <input type="text" className="form-control" placeholder="e.g. AgriFeeds Ltd." value={editPurchaseVendor} onChange={e => setEditPurchaseVendor(e.target.value)} required />
+          </div>
+          {editPurchaseQty > 0 && editPurchaseCost > 0 && (
+            <div className="form-preview-pill">
+              💡 Cost per kg: <strong>Rs {(editPurchaseCost / editPurchaseQty).toFixed(2)}</strong>
+            </div>
+          )}
+        </form>
+      </Modal>
+
+      {/* ── Edit Consumption Modal ── */}
+      <Modal
+        isOpen={isEditConsumptionModalOpen}
+        onClose={() => setIsEditConsumptionModalOpen(false)}
+        title="✏️ Edit Feed Consumption"
+        footer={
+          <>
+            <button className="btn btn-secondary" onClick={() => setIsEditConsumptionModalOpen(false)}>Cancel</button>
+            <button className="btn btn-primary" onClick={handleEditConsumptionSubmit}>Save Changes</button>
+          </>
+        }
+      >
+        <form onSubmit={handleEditConsumptionSubmit} className="modal-form-grid">
+          <div className="fm-form-row">
+            <div className="form-group">
+              <label className="form-label">Date</label>
+              <input type="date" className="form-control" value={editConsumptionDate} onChange={e => setEditConsumptionDate(e.target.value)} required />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Feed Type</label>
+              <select className="form-control" value={editConsumptionType} onChange={e => setEditConsumptionType(e.target.value as FeedType)}>
+                <option value="Starter">🐣 Starter</option>
+                <option value="Grower">🌱 Grower</option>
+                <option value="Finisher">🏁 Finisher</option>
+                <option value="Layer Mash">🥚 Layer Mash</option>
+              </select>
+            </div>
+          </div>
+          <div className="fm-form-row">
+            <div className="form-group">
+              <label className="form-label">Batch</label>
+              <select className="form-control" value={editConsumptionBatchId} onChange={e => setEditConsumptionBatchId(e.target.value)} required>
+                <option value="">Select active batch...</option>
+                {activeBatches.map(b => (
+                  <option key={b.id} value={b.id}>{b.id} — {b.type} ({b.currentQuantity} birds)</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Quantity Consumed (kg)</label>
+              <input type="number" min="0.1" step="0.1" className="form-control" value={editConsumptionQty} onChange={e => setEditConsumptionQty(Number(e.target.value))} required />
+            </div>
+          </div>
+          {editConsumptionType && (
+            <div className="form-preview-pill">
+              📦 Current {editConsumptionType} stock: <strong>{getFeedStock(editConsumptionType).toLocaleString()} kg</strong>
+            </div>
+          )}
+        </form>
+      </Modal>
+
       <style>{`
         .feed-stats-row {
           display: grid;
@@ -499,6 +681,7 @@ export const FeedMgmt: React.FC = () => {
 
         .empty-state { text-align: center; padding: var(--spacing-xl) 0; color: var(--text-muted); }
         .empty-icon  { font-size: 2.5rem; margin-bottom: 0.5rem; }
+        .btn-sm-custom { padding: 0.35rem 0.75rem; font-size: 0.75rem; }
 
         .modal-form-grid { display: flex; flex-direction: column; gap: var(--spacing-md); }
         .fm-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-md); }
