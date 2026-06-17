@@ -141,7 +141,151 @@ export const Reports: React.FC = () => {
   };
 
   const exportPDF = () => {
-    window.print();
+    const periodLabel =
+      period === 'daily' ? 'Daily' :
+      period === 'weekly' ? 'Weekly' :
+      period === 'monthly' ? 'Last 30 Days' : 'Custom Range';
+
+    // Build audit table rows
+    const salesRows = sales.filter(s => isDateInPeriod(s.date)).map(s => `
+      <tr>
+        <td>${s.date}</td>
+        <td><b>${s.type} Sale</b> (${s.customerName})</td>
+        <td><span class="badge badge-green">Revenue Income</span></td>
+        <td>${s.quantity.toLocaleString()} ${s.type === 'Bird' ? 'birds' : 'eggs'}</td>
+        <td class="amount-pos">+Rs ${s.totalAmount.toFixed(2)}</td>
+      </tr>`).join('');
+
+    const expenseRows = expenses.filter(e => isDateInPeriod(e.date)).map(e => `
+      <tr>
+        <td>${e.date}</td>
+        <td>${e.description}</td>
+        <td><span class="badge badge-red">Expense Outflow</span></td>
+        <td>—</td>
+        <td class="amount-neg">-Rs ${e.amount.toFixed(2)}</td>
+      </tr>`).join('');
+
+    const emptyRow = (!salesRows && !expenseRows)
+      ? `<tr><td colspan="5" style="text-align:center;padding:2rem 0;color:#9ca3af;">No records match the selected date range.</td></tr>`
+      : '';
+
+    const pw = window.open('', '_blank', 'width=1000,height=750');
+    if (!pw) return;
+    pw.document.write(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Farm Report — ${startDate} to ${endDate}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    @page { size: A4; margin: 1.5cm; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Outfit', sans-serif; background: #fff; color: #111827; font-size: 13px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+    /* Report Header */
+    .report-header { border-bottom: 2px solid #d1d5db; padding-bottom: 1rem; margin-bottom: 1.5rem; }
+    .report-header h2 { font-size: 1.3rem; letter-spacing: 0.04em; color: #111827; }
+    .report-header p { font-size: 0.82rem; color: #6b7280; margin-top: 0.3rem; }
+    .report-header .period-badge {
+      display: inline-block; background: #d1fae5; color: #059669;
+      border: 1px solid #6ee7b7; border-radius: 999px;
+      padding: 0.15rem 0.65rem; font-size: 0.75rem; font-weight: 600; margin-top: 0.4rem;
+    }
+
+    /* KPI Cards */
+    .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 1.5rem; }
+    .kpi-card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 0.85rem 1rem; }
+    .kpi-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.06em; color: #6b7280; font-weight: 600; }
+    .kpi-value { font-size: 1.35rem; font-weight: 800; color: #111827; margin: 0.25rem 0 0.15rem; }
+    .kpi-value.green { color: #059669; }
+    .kpi-value.rose { color: #dc2626; }
+    .kpi-sub { font-size: 0.68rem; color: #9ca3af; }
+
+    /* Audit Table */
+    .section-title { font-size: 0.95rem; font-weight: 700; color: #111827; margin-bottom: 0.5rem; }
+    .section-sub { font-size: 0.75rem; color: #9ca3af; margin-bottom: 1rem; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #f3f4f6; color: #374151; border-bottom: 2px solid #9ca3af; padding: 0.5rem 0.75rem; font-size: 0.72rem; text-align: left; text-transform: uppercase; letter-spacing: 0.04em; }
+    td { border-bottom: 1px solid #e5e7eb; padding: 0.6rem 0.75rem; color: #374151; }
+    tr:last-child td { border-bottom: none; }
+
+    /* Badges */
+    .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.7rem; font-weight: 600; }
+    .badge-green { background: #d1fae5; color: #059669; border: 1px solid #6ee7b7; }
+    .badge-red { background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; }
+
+    /* Amount colours */
+    .amount-pos { color: #059669; font-weight: 700; text-align: right; }
+    .amount-neg { color: #dc2626; font-weight: 700; text-align: right; }
+
+    /* Totals row */
+    .totals-row { border-top: 2px solid #111827; }
+    .totals-row td { font-weight: 700; color: #111827; padding-top: 0.75rem; }
+  </style>
+</head>
+<body>
+  <div class="report-header">
+    <h2>AKSHA FARM — FARM PERFORMANCE STATEMENT</h2>
+    <p><b>Period:</b> ${startDate} &nbsp;→&nbsp; ${endDate}</p>
+    <span class="period-badge">${periodLabel}</span>
+    <p style="margin-top:0.4rem;">Generated: ${new Date().toLocaleString()}</p>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-label">Mortality Count</div>
+      <div class="kpi-value rose">${periodMortality} birds</div>
+      <div class="kpi-sub">Logged deaths during period</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Feed Consumed</div>
+      <div class="kpi-value">${periodFeedConsumed.toLocaleString()} kg</div>
+      <div class="kpi-sub">Total feed consumption weight</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Eggs Usable Yield</div>
+      <div class="kpi-value" style="color:#d97706;">${periodEggsUsable.toLocaleString()}</div>
+      <div class="kpi-sub">Damaged: ${periodEggsDamaged.toLocaleString()} eggs (${periodEggsTotal > 0 ? ((periodEggsDamaged/periodEggsTotal)*100).toFixed(1) : 0}%)</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Net Profit</div>
+      <div class="kpi-value ${netPAndL >= 0 ? 'green' : 'rose'}">${netPAndL >= 0 ? '+' : ''}Rs ${netPAndL.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+      <div class="kpi-sub">Revenue: Rs ${periodIncome.toLocaleString()} | Costs: Rs ${periodExpense.toLocaleString()}</div>
+    </div>
+  </div>
+
+  <div class="section-title">Consolidated Audit Grid</div>
+  <div class="section-sub">Transaction journals matching the selected date filters</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Source Metric</th>
+        <th>Accounting Ledger</th>
+        <th>Quantity</th>
+        <th style="text-align:right;">Cash Impact (Rs)</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${salesRows}
+      ${expenseRows}
+      ${emptyRow}
+    </tbody>
+    ${(salesRows || expenseRows) ? `
+    <tfoot>
+      <tr class="totals-row">
+        <td colspan="4">Period Net Total</td>
+        <td class="${netPAndL >= 0 ? 'amount-pos' : 'amount-neg'}">${netPAndL >= 0 ? '+' : ''}Rs ${netPAndL.toFixed(2)}</td>
+      </tr>
+    </tfoot>` : ''}
+  </table>
+
+  <script>
+    window.onload = function() { window.print(); window.onafterprint = function() { window.close(); }; };
+  </script>
+</body>
+</html>`);
+    pw.document.close();
   };
 
   return (
