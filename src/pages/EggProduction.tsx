@@ -148,21 +148,30 @@ export const EggProduction: React.FC = () => {
                   <th>Collected Count</th>
                   <th>Damaged Count</th>
                   <th>Usable Eggs (Net)</th>
-                  <th>Tray Equivalent (30/Tray)</th>
+                  <th>Boxes Needed (260/Box)</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {eggCollections.map(c => {
-                  const trays = (c.netQty / 30).toFixed(1);
+                  const boxesFull = Math.floor(c.netQty / 260);
+                  const remainder = c.netQty % 260;
+                  const boxesNeeded = remainder > 0 ? boxesFull + 1 : boxesFull;
                   return (
                     <tr key={c.date}>
                       <td>{c.date}</td>
                       <td><b>{c.collectedQty.toLocaleString()}</b></td>
                       <td><span className="color-rose">{c.damagedQty}</span></td>
                       <td><span className="color-emerald"><b>{c.netQty.toLocaleString()}</b></span></td>
-                      <td>{trays} trays</td>
+                      <td>
+                        <span style={{ fontWeight: 700 }}>{boxesNeeded} boxes</span>
+                        {remainder > 0 && (
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block' }}>
+                            ({boxesFull} full + {remainder} eggs)
+                          </span>
+                        )}
+                      </td>
                       <td>
                         <span className={`badge ${c.damagedQty / c.collectedQty < 0.02 ? 'badge-emerald' : 'badge-amber'}`}>
                           {c.damagedQty / c.collectedQty < 0.02 ? 'Optimal' : 'Needs attention'}
