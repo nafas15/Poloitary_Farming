@@ -3,8 +3,28 @@ import { useFarm } from '../context/FarmContext';
 import type { Sale } from '../context/FarmContext';
 import { Modal } from '../components/Modal';
 
+// Persist paid status per invoice in localStorage (no DB migration needed)
+const PAID_KEY = 'aksha_paid_invoices';
+const loadPaidIds = (): Set<string> => {
+  try { return new Set(JSON.parse(localStorage.getItem(PAID_KEY) || '[]')); } catch { return new Set(); }
+};
+const savePaidIds = (ids: Set<string>) => {
+  localStorage.setItem(PAID_KEY, JSON.stringify([...ids]));
+};
+
 export const SalesMgmt: React.FC = () => {
   const { batches, sales, deleteSale, updateSale } = useFarm();
+
+  // Paid status (local, persisted to localStorage)
+  const [paidIds, setPaidIds] = useState<Set<string>>(loadPaidIds);
+  const togglePaid = (saleId: string) => {
+    setPaidIds(prev => {
+      const next = new Set(prev);
+      if (next.has(saleId)) next.delete(saleId); else next.add(saleId);
+      savePaidIds(next);
+      return next;
+    });
+  };
 
   const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
   const [activeInvoice, setActiveInvoice] = useState<Sale | null>(null);
@@ -72,7 +92,6 @@ export const SalesMgmt: React.FC = () => {
     const invoiceHtml = (el as HTMLElement).innerHTML;
     const totalExtras = extraCharges.reduce((s, c) => s + c.amount, 0);
     const grandTotal = activeInvoice.totalAmount + totalExtras;
-    const change = amountPaid - grandTotal;
 
     const pw = window.open('', '_blank', 'width=900,height=700');
     if (!pw) return;
@@ -151,7 +170,7 @@ export const SalesMgmt: React.FC = () => {
     }
     .balance-row { font-size: 1rem; font-weight: 700; border-top: 1px solid #d1d5db; padding-top: 0.5rem; margin-top: 0.15rem; }
     .change-positive { color: #059669; }
-    .balance-due { color: #dc2626; }
+    .balance-due { color: #111827; }
     .invoice-footer-notes {
       text-align: center; font-size: 0.78rem; color: #9ca3af;
       border-top: 1px solid #e5e7eb; padding-top: 1rem;
@@ -328,14 +347,21 @@ export const SalesMgmt: React.FC = () => {
                           </td>
                           <td>{s.quantity.toLocaleString()} {s.type === 'Bird' ? 'birds' : 'eggs'}</td>
                           <td>Rs {s.unitPrice.toFixed(2)}</td>
-                          <td><strong className="revenue-amount">Rs {s.totalAmount.toFixed(2)}</strong></td>
+                          <td>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', alignItems: 'flex-start' }}>
+                              <strong className="revenue-amount">Rs {s.totalAmount.toFixed(2)}</strong>
+                              {paidIds.has(s.id) && (
+                                <span className="paid-status-badge">✅ Paid</span>
+                              )}
+                            </div>
+                          </td>
                           <td>
                             <strong className={profit >= 0 ? "profit-amount-pos" : "profit-amount-neg"}>
                               Rs {profit.toFixed(2)}
                             </strong>
                           </td>
                           <td>
-                            <div style={{ display: 'flex', gap: '0.4rem' }}>
+                            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                               <button type="button" className="btn btn-secondary btn-xs-custom" onClick={() => handleViewInvoice(s)}>
                                 👁️ Invoice
                               </button>
@@ -346,16 +372,13 @@ export const SalesMgmt: React.FC = () => {
                               >
                                 ✏️ Edit
                               </button>
-                              <button 
+                              <button
                                 type="button"
-                                className="btn btn-danger btn-xs-custom" 
-                                onClick={() => {
-                                  if (window.confirm(`Are you sure you want to delete invoice ${s.invoiceId}?`)) {
-                                    deleteSale(s.id);
-                                  }
-                                }}
+                                className={`btn btn-xs-custom ${paidIds.has(s.id) ? 'btn-paid-active' : 'btn-mark-paid'}`}
+                                onClick={() => togglePaid(s.id)}
+                                title={paidIds.has(s.id) ? 'Mark as unpaid' : 'Mark as paid'}
                               >
-                                🗑️ Delete
+                                {paidIds.has(s.id) ? '🔄 Unmark' : '✅ Mark Paid'}
                               </button>
                             </div>
                           </td>
@@ -376,10 +399,27 @@ export const SalesMgmt: React.FC = () => {
         onClose={() => setIsEditSaleModalOpen(false)}
         title={`✏️ Edit Sale Invoice: ${sales.find(s => s.id === editingSaleId)?.invoiceId || ''}`}
         footer={
-          <>
-            <button className="btn btn-secondary" onClick={() => setIsEditSaleModalOpen(false)}>Cancel</button>
-            <button className="btn btn-primary" onClick={handleEditSaleSubmit}>Save Changes</button>
-          </>
+          <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+            {/* Left: danger delete */}
+            <button
+              className="btn btn-danger"
+              type="button"
+              onClick={() => {
+                const inv = sales.find(s => s.id === editingSaleId);
+                if (inv && window.confirm(`Delete invoice ${inv.invoiceId}? This cannot be undone.`)) {
+                  deleteSale(editingSaleId);
+                  setIsEditSaleModalOpen(false);
+                }
+              }}
+            >
+              🗑️ Delete Invoice
+            </button>
+            {/* Right: cancel + save */}
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button className="btn btn-secondary" type="button" onClick={() => setIsEditSaleModalOpen(false)}>Cancel</button>
+              <button className="btn btn-primary" type="button" onClick={handleEditSaleSubmit}>Save Changes</button>
+            </div>
+          </div>
         }
       >
         <form onSubmit={handleEditSaleSubmit} className="modal-form-grid">
@@ -785,6 +825,28 @@ export const SalesMgmt: React.FC = () => {
         .revenue-amount { color: var(--color-emerald); }
         .btn-xs-custom  { padding: 0.3rem 0.65rem; font-size: 0.72rem; font-weight: 600; border-radius: var(--radius-sm); }
 
+        /* Mark Paid buttons */
+        .btn-mark-paid {
+          background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.3);
+          color: var(--color-emerald); font-family: var(--font-family);
+          cursor: pointer; transition: all var(--transition-fast);
+        }
+        .btn-mark-paid:hover { background: rgba(16,185,129,0.22); }
+        .btn-paid-active {
+          background: rgba(255,255,255,0.06); border: 1px solid var(--border-color);
+          color: var(--text-muted); font-family: var(--font-family);
+          cursor: pointer; transition: all var(--transition-fast);
+        }
+        .btn-paid-active:hover { background: rgba(239,68,68,0.1); color: var(--color-rose); border-color: rgba(239,68,68,0.3); }
+
+        /* Paid status badge in Total column */
+        .paid-status-badge {
+          font-size: 0.65rem; font-weight: 700;
+          background: rgba(16,185,129,0.12); color: var(--color-emerald);
+          border: 1px solid rgba(16,185,129,0.25); border-radius: 999px;
+          padding: 0.1rem 0.45rem; white-space: nowrap;
+        }
+
         .sm-empty-state { text-align: center; padding: var(--spacing-xl) 0; color: var(--text-muted); }
         .sm-empty-icon  { font-size: 2.5rem; margin-bottom: 0.5rem; }
 
@@ -853,7 +915,7 @@ export const SalesMgmt: React.FC = () => {
         .payment-input-row { align-items: center; margin-top: 0.5rem; }
         .balance-row { font-size: 1rem; font-weight: 700; border-top: 1px solid var(--border-color-hover); padding-top: 0.5rem; margin-top: 0.15rem; }
         .change-positive { color: var(--color-emerald); }
-        .balance-due { color: var(--color-rose); }
+        .balance-due { color: var(--text-primary); }
         .payment-given-row {
           color: var(--color-amber); font-weight: 600;
           border-top: 1px dashed rgba(245,158,11,0.25); padding-top: 0.4rem; margin-top: 0.1rem;
