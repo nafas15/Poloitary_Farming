@@ -437,10 +437,12 @@ export const SalesMgmt: React.FC = () => {
 
               {/* ── Extra Charges ── */}
               {extraCharges.map((c, i) => (
-                <div key={i} className="calc-row extra-charge-row">
-                  <span>+ {c.label}:</span>
+                <div key={i} className={`calc-row extra-charge-row ${c.amount < 0 ? 'charge-deduction' : 'charge-addition'}`}>
+                  <span>{c.amount < 0 ? '− ' : '+ '}{c.label}:</span>
                   <span className="extra-charge-right">
-                    Rs {c.amount.toFixed(2)}
+                    <span className={c.amount < 0 ? 'charge-neg-val' : 'charge-pos-val'}>
+                      {c.amount < 0 ? '−' : '+'} Rs {Math.abs(c.amount).toFixed(2)}
+                    </span>
                     <button
                       type="button"
                       className="remove-charge-btn"
@@ -468,22 +470,35 @@ export const SalesMgmt: React.FC = () => {
                   <option>Loading</option>
                   <option>Handling</option>
                   <option>Discount</option>
+                  <option>Advance Deduction</option>
                   <option>Other</option>
                 </select>
+                {/* ± toggle: positive or negative */}
+                <button
+                  type="button"
+                  className={`charge-sign-toggle ${newChargeAmount < 0 ? 'sign-neg' : 'sign-pos'}`}
+                  title={newChargeAmount < 0 ? 'Currently Deduction (−). Click to switch to Addition (+)' : 'Currently Addition (+). Click to switch to Deduction (−)'}
+                  onClick={() => setNewChargeAmount(prev => prev === 0 ? -0.01 : -prev)}
+                >
+                  {newChargeAmount < 0 ? '−' : '+'}
+                </button>
                 <input
                   type="number"
-                  min="0"
                   step="0.01"
+                  min="0"
                   className="charge-amount-input"
                   placeholder="Amount"
-                  value={newChargeAmount === 0 ? '' : newChargeAmount}
-                  onChange={e => setNewChargeAmount(Number(e.target.value))}
+                  value={newChargeAmount === 0 ? '' : Math.abs(newChargeAmount)}
+                  onChange={e => {
+                    const abs = Math.abs(Number(e.target.value));
+                    setNewChargeAmount(newChargeAmount < 0 ? -abs : abs);
+                  }}
                 />
                 <button
                   type="button"
                   className="add-charge-btn"
                   onClick={() => {
-                    if (newChargeAmount > 0) {
+                    if (newChargeAmount !== 0) {
                       const newCharge = { label: newChargeLabel, amount: newChargeAmount };
                       const updated = [...extraCharges, newCharge];
                       setExtraCharges(updated);
@@ -757,8 +772,36 @@ export const SalesMgmt: React.FC = () => {
 
 
         /* Extra charge rows */
-        .extra-charge-row { color: #38bdf8; }
+        .extra-charge-row { }
+        .charge-addition { color: #38bdf8; }
+        .charge-deduction { color: var(--color-rose); }
+        .charge-pos-val { color: #38bdf8; font-weight: 600; }
+        .charge-neg-val { color: var(--color-rose); font-weight: 600; }
         .extra-charge-right { display: flex; align-items: center; gap: 0.35rem; }
+
+        /* ± sign toggle button */
+        .charge-sign-toggle {
+          width: 1.6rem; height: 1.6rem; flex-shrink: 0;
+          border-radius: var(--radius-sm); font-size: 0.95rem; font-weight: 800;
+          cursor: pointer; display: flex; align-items: center; justify-content: center;
+          border: 1px solid; transition: all var(--transition-fast); font-family: var(--font-family);
+          line-height: 1;
+        }
+        .charge-sign-toggle.sign-pos {
+          background: rgba(16,185,129,0.12); border-color: rgba(16,185,129,0.35);
+          color: var(--color-emerald);
+        }
+        .charge-sign-toggle.sign-pos:hover {
+          background: rgba(16,185,129,0.25);
+        }
+        .charge-sign-toggle.sign-neg {
+          background: rgba(239,68,68,0.12); border-color: rgba(239,68,68,0.35);
+          color: var(--color-rose);
+        }
+        .charge-sign-toggle.sign-neg:hover {
+          background: rgba(239,68,68,0.25);
+        }
+
         .remove-charge-btn {
           background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.2);
           color: var(--color-rose); border-radius: 50%; width: 1.1rem; height: 1.1rem;
