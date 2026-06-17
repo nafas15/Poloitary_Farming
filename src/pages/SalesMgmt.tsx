@@ -90,8 +90,6 @@ export const SalesMgmt: React.FC = () => {
     const el = document.querySelector('.printable-invoice-container');
     if (!el) return;
     const invoiceHtml = (el as HTMLElement).innerHTML;
-    const totalExtras = extraCharges.reduce((s, c) => s + c.amount, 0);
-    const grandTotal = activeInvoice.totalAmount + totalExtras;
 
     const pw = window.open('', '_blank', 'width=900,height=700');
     if (!pw) return;
