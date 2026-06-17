@@ -279,6 +279,18 @@ export const Login: React.FC = () => {
         @keyframes spin {
           to { transform: rotate(360deg); }
         }
+
+        @media (max-width: 480px) {
+          .login-card {
+            padding: var(--spacing-lg) !important;
+            margin: var(--spacing-md);
+            max-width: calc(100% - 2rem);
+          }
+          .role-selector {
+            flex-direction: column;
+            gap: var(--spacing-xs);
+          }
+        }
       `}</style>
     </div>
   );

@@ -3,9 +3,10 @@ import { useFarm } from '../context/FarmContext';
 
 interface HeaderProps {
   activeTab: string;
+  toggleSidebar: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ activeTab }) => {
+export const Header: React.FC<HeaderProps> = ({ activeTab, toggleSidebar }) => {
   const { batches, sales, expenses, currentUser } = useFarm();
   const [time, setTime] = useState(new Date());
 
@@ -46,13 +47,22 @@ export const Header: React.FC<HeaderProps> = ({ activeTab }) => {
   return (
     <header className="header no-print">
       <div className="header-left">
-        <h1 className="text-gradient">{getTitle()}</h1>
-        <div className="system-time">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10" />
-            <polyline points="12 6 12 12 16 14" />
+        <button className="sidebar-toggle-btn" onClick={toggleSidebar} aria-label="Toggle Navigation">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="4" x2="20" y1="12" y2="12" />
+            <line x1="4" x2="20" y1="6" y2="6" />
+            <line x1="4" x2="20" y1="18" y2="18" />
           </svg>
-          <span>{time.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} | {time.toLocaleTimeString()}</span>
+        </button>
+        <div>
+          <h1 className="text-gradient">{getTitle()}</h1>
+          <div className="system-time">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+            <span>{time.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} | {time.toLocaleTimeString()}</span>
+          </div>
         </div>
       </div>
 
@@ -88,9 +98,34 @@ export const Header: React.FC<HeaderProps> = ({ activeTab }) => {
           margin-bottom: var(--spacing-xl);
         }
 
+        .header-left {
+          display: flex;
+          align-items: center;
+          gap: var(--spacing-md);
+        }
+
+        .sidebar-toggle-btn {
+          display: none;
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid var(--border-color);
+          color: var(--text-primary);
+          padding: 0.5rem;
+          border-radius: var(--radius-sm);
+          cursor: pointer;
+          align-items: center;
+          justify-content: center;
+          transition: all var(--transition-fast);
+        }
+
+        .sidebar-toggle-btn:hover {
+          background: rgba(255, 255, 255, 0.1);
+          border-color: var(--border-color-hover);
+        }
+
         .header-left h1 {
           font-size: 1.75rem;
           margin-bottom: var(--spacing-xs);
+          line-height: 1.2;
         }
 
         .system-time {
@@ -145,6 +180,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab }) => {
           color: var(--text-muted);
           text-transform: uppercase;
           letter-spacing: 0.05em;
+          font-weight: 500;
         }
 
         .stat-value {
@@ -173,10 +209,26 @@ export const Header: React.FC<HeaderProps> = ({ activeTab }) => {
           .header-right {
             width: 100%;
             justify-content: flex-start;
+            flex-wrap: wrap;
+          }
+
+          .sidebar-toggle-btn {
+            display: inline-flex;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .header-right {
+            flex-direction: column;
+            align-items: stretch;
+            width: 100%;
+            gap: var(--spacing-sm);
+          }
+          .header-stat {
+            width: 100%;
           }
         }
       `}</style>
     </header>
   );
 };
-

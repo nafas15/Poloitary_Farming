@@ -356,6 +356,19 @@ tr:hover td {
   background: rgba(10, 14, 23, 0.4);
 }
 
+@media (max-width: 480px) {
+  .modal-footer {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md);
+  }
+  .modal-footer .btn {
+    width: 100%;
+  }
+}
+
+
 /* Dashboard Specifics */
 .kpi-container {
   margin-bottom: var(--spacing-xl);

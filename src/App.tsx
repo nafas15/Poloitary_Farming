@@ -41,11 +41,17 @@ function PageLoader({ message = 'Loading...' }: { message?: string }) {
 function MainAppContent() {
   const { currentUser, isLoading } = useFarm();
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // If not logged in, render the login page
   if (!currentUser) {
     return <Login />;
   }
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    setSidebarOpen(false);
+  };
 
   // Render the appropriate tab contents
   const renderTabContent = () => {
@@ -66,9 +72,14 @@ function MainAppContent() {
 
   return (
     <div className="app-container">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+      <Sidebar 
+        activeTab={activeTab} 
+        setActiveTab={handleTabChange} 
+        isOpen={sidebarOpen} 
+        setIsOpen={setSidebarOpen} 
+      />
       <main className="main-content">
-        <Header activeTab={activeTab} />
+        <Header activeTab={activeTab} toggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
         <div className="tab-page-container">
           {isLoading ? (
             <PageLoader message="Syncing with database..." />

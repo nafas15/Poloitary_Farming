@@ -4,9 +4,11 @@ import { useFarm } from '../context/FarmContext';
 interface SidebarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
+  isOpen: boolean;
+  setIsOpen: (open: boolean) => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
   const { currentUser, logout } = useFarm();
 
   const menuItems = [
@@ -121,46 +123,58 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
   });
 
   return (
-    <aside className="sidebar no-print">
-      <div className="sidebar-logo">
-        <div className="logo-icon">🐔</div>
-        <div className="logo-text">
-          <h2>AKSHA FARM</h2>
-          <span>Premium Poultry Products</span>
-        </div>
-      </div>
-
-      <nav className="sidebar-menu">
-        {filteredMenuItems.map(item => (
-          <button
-            key={item.id}
-            onClick={() => setActiveTab(item.id)}
-            className={`menu-item ${activeTab === item.id ? 'active' : ''}`}
-          >
-            {item.icon}
-            <span>{item.label}</span>
+    <>
+      {isOpen && (
+        <div className="sidebar-backdrop no-print" onClick={() => setIsOpen(false)} />
+      )}
+      <aside className={`sidebar no-print ${isOpen ? 'open' : ''}`}>
+        <div className="sidebar-logo">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)' }}>
+            <div className="logo-icon">🐔</div>
+            <div className="logo-text">
+              <h2>AKSHA FARM</h2>
+              <span>Premium Poultry Products</span>
+            </div>
+          </div>
+          <button className="sidebar-close-btn" onClick={() => setIsOpen(false)} aria-label="Close menu">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" x2="6" y1="6" y2="18" />
+              <line x1="6" x2="18" y1="6" y2="18" />
+            </svg>
           </button>
-        ))}
-      </nav>
-
-      <div className="sidebar-footer">
-        <div className="user-profile">
-          <div className="user-avatar">
-            {currentUser?.username.substring(0, 2).toUpperCase()}
-          </div>
-          <div className="user-info">
-            <span className="username">{currentUser?.username}</span>
-            <span className="user-role">{currentUser?.role}</span>
-          </div>
         </div>
-        <button className="btn-logout" onClick={logout} title="Sign Out">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-            <polyline points="16 17 21 12 16 7" />
-            <line x1="21" x2="9" y1="12" y2="12" />
-          </svg>
-        </button>
-      </div>
+
+        <nav className="sidebar-menu">
+          {filteredMenuItems.map(item => (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              className={`menu-item ${activeTab === item.id ? 'active' : ''}`}
+            >
+              {item.icon}
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </nav>
+
+        <div className="sidebar-footer">
+          <div className="user-profile">
+            <div className="user-avatar">
+              {currentUser?.username.substring(0, 2).toUpperCase()}
+            </div>
+            <div className="user-info">
+              <span className="username">{currentUser?.username}</span>
+              <span className="user-role">{currentUser?.role}</span>
+            </div>
+          </div>
+          <button className="btn-logout" onClick={logout} title="Sign Out">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" x2="9" y1="12" y2="12" />
+            </svg>
+          </button>
+        </div>
 
       <style>{`
         .sidebar {
@@ -317,6 +331,43 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
           background: var(--color-rose-glow);
         }
 
+        .sidebar-backdrop {
+          display: none;
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(5, 8, 15, 0.65);
+          backdrop-filter: blur(4px);
+          -webkit-backdrop-filter: blur(4px);
+          z-index: 999;
+          animation: fadeIn var(--transition-fast) ease-out;
+        }
+
+        .sidebar-close-btn {
+          display: none;
+          background: none;
+          border: none;
+          color: var(--text-secondary);
+          cursor: pointer;
+          padding: 0.25rem;
+          border-radius: var(--radius-sm);
+          align-items: center;
+          justify-content: center;
+          transition: all var(--transition-fast);
+        }
+
+        .sidebar-close-btn:hover {
+          color: var(--text-primary);
+          background: rgba(255, 255, 255, 0.05);
+        }
+
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
         @media (max-width: 1024px) {
           .sidebar {
             width: 80px;
@@ -358,12 +409,62 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
         }
 
         @media (max-width: 768px) {
+          .sidebar-backdrop {
+            display: block;
+          }
+
+          .sidebar-close-btn {
+            display: inline-flex;
+          }
+
           .sidebar {
-            display: none;
+            display: flex !important;
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            width: 260px !important;
+            transform: translateX(-100%);
+            transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
+            z-index: 1000;
+            background: #111827;
+            box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5);
+          }
+
+          .sidebar.open {
+            transform: translateX(0);
+          }
+
+          .logo-text, .user-info, .sidebar-logo .logo-icon, .menu-item span {
+            display: block !important;
+          }
+
+          .sidebar-logo {
+            display: flex !important;
+            justify-content: space-between !important;
+            width: 100%;
+            padding: 1.5rem var(--spacing-lg) !important;
+          }
+
+          .sidebar-logo::before {
+            content: none !important;
+          }
+
+          .menu-item {
+            justify-content: flex-start !important;
+            padding: 0.75rem 1rem !important;
+          }
+
+          .sidebar-footer {
+            flex-direction: row !important;
+            justify-content: space-between !important;
+            padding: var(--spacing-lg) !important;
+            width: 100%;
           }
         }
       `}</style>
     </aside>
+  </>
   );
 };
 
