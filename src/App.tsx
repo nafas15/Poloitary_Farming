@@ -3,6 +3,7 @@ import { FarmProvider, useFarm } from './context/FarmContext';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { Login } from './pages/Login';
+import { isSupabaseConfigured } from './lib/supabaseClient';
 
 // Lazy-loaded pages — Vite will split these into separate chunks
 const Dashboard    = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })));
@@ -83,6 +84,40 @@ function MainAppContent() {
 }
 
 function App() {
+  if (!isSupabaseConfigured) {
+    return (
+      <div className="app-container" style={{ justifyContent: 'center', alignItems: 'center', padding: '2rem' }}>
+        <div className="glass-card" style={{ maxWidth: '560px', width: '100%', padding: '2.5rem', border: '1px solid rgba(244, 63, 94, 0.3)' }}>
+          <h2 className="text-gradient-rose" style={{ fontSize: '1.8rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            ⚠️ Supabase Credentials Missing
+          </h2>
+          <p style={{ color: 'var(--text-secondary)', lineHeight: '1.6', marginBottom: '1.5rem' }}>
+            The application built successfully, but the webpage UI cannot load because the database connection credentials are not configured in your deployment.
+          </p>
+          <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', marginBottom: '1.75rem' }}>
+            <h4 style={{ color: 'var(--text-primary)', marginBottom: '0.75rem' }}>How to fix this in Vercel:</h4>
+            <ol style={{ color: 'var(--text-secondary)', paddingLeft: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.6rem', fontSize: '0.9rem' }}>
+              <li>Go to your <strong>Vercel Dashboard</strong> and open this project.</li>
+              <li>Navigate to <strong>Settings</strong> &gt; <strong>Environment Variables</strong>.</li>
+              <li>Add the following two variables (copy their values from your local <code>.env</code> file):
+                <ul style={{ listStyleType: 'circle', paddingLeft: '1.25rem', marginTop: '0.4rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                  <li><code>VITE_SUPABASE_URL</code></li>
+                  <li><code>VITE_SUPABASE_ANON_KEY</code></li>
+                </ul>
+              </li>
+              <li>Go to the <strong>Deployments</strong> tab, select your latest deployment, click the three dots, and choose <strong>Redeploy</strong>.</li>
+            </ol>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <a href="https://vercel.com" target="_blank" rel="noreferrer" className="btn btn-primary">
+              Go to Vercel Dashboard
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <FarmProvider>
       <MainAppContent />
