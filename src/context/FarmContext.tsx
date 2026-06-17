@@ -140,6 +140,7 @@ interface FarmContextType {
   getFeedStock: (type: FeedType) => number;
   updateBatch: (batchId: string, updated: Omit<BirdBatch, 'id' | 'mortalityLogs'>) => Promise<void>;
   updateFeedPurchase: (purchaseId: string, updated: Omit<FeedPurchase, 'id'>) => Promise<void>;
+  deleteFeedPurchase: (purchaseId: string) => Promise<void>;
   updateFeedConsumption: (consumptionId: string, updated: Omit<FeedConsumption, 'id'>) => Promise<void>;
   updateVaccineSchedule: (id: string, updated: Omit<VaccineSchedule, 'id'>) => Promise<void>;
   updateMedicalRecord: (recordId: string, updated: Omit<MedicalRecord, 'id'>) => Promise<void>;
@@ -867,6 +868,21 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const deleteFeedPurchase = async (purchaseId: string) => {
+    try {
+      await Promise.all([
+        supabase.from('feed_purchases').delete().eq('id', purchaseId),
+        supabase
+          .from('expenses')
+          .delete()
+          .eq('reference_id', purchaseId)
+          .eq('is_auto_generated', true)
+      ]);
+    } catch (err) {
+      console.error('Failed to delete feed purchase:', err);
+    }
+  };
+
   const updateFeedConsumption = async (consumptionId: string, updated: Omit<FeedConsumption, 'id'>) => {
     try {
       await supabase
@@ -1140,6 +1156,7 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
         deleteExpense,
         updateBatch,
         updateFeedPurchase,
+        deleteFeedPurchase,
         updateFeedConsumption,
         updateVaccineSchedule,
         updateMedicalRecord,

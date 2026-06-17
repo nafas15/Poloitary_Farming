@@ -4,7 +4,7 @@ import type { FeedType } from '../context/FarmContext';
 import { Modal } from '../components/Modal';
 
 export const FeedMgmt: React.FC = () => {
-  const { batches, feedPurchases, feedConsumption, addFeedPurchase, addFeedConsumption, getFeedStock, updateFeedPurchase, updateFeedConsumption } = useFarm();
+  const { batches, feedPurchases, feedConsumption, addFeedPurchase, addFeedConsumption, getFeedStock, updateFeedPurchase, updateFeedConsumption, deleteFeedPurchase } = useFarm();
 
   const [subTab, setSubTab] = useState<'inventory' | 'purchases' | 'consumption'>('inventory');
   const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
@@ -40,6 +40,11 @@ export const FeedMgmt: React.FC = () => {
       vendor: editPurchaseVendor
     });
     setIsEditPurchaseModalOpen(false);
+  };
+
+  const handleDeletePurchase = async (fp: any) => {
+    if (!window.confirm(`Delete this ${fp.feedType} purchase (${fp.quantityKg} kg from ${fp.vendor} on ${fp.date})?\n\nThis will also remove the linked expense record.`)) return;
+    await deleteFeedPurchase(fp.id);
   };
 
   // Edit Consumption States
@@ -300,13 +305,22 @@ export const FeedMgmt: React.FC = () => {
                       <td>Rs {(fp.cost / fp.quantityKg).toFixed(2)}/kg</td>
                       <td><strong className="color-emerald">Rs {fp.cost.toFixed(2)}</strong></td>
                       <td>
-                        <button
-                          type="button"
-                          className="btn btn-secondary btn-sm-custom"
-                          onClick={() => handleOpenEditPurchase(fp)}
-                        >
-                          ✏️ Edit
-                        </button>
+                        <div className="action-btn-group">
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm-custom"
+                            onClick={() => handleOpenEditPurchase(fp)}
+                          >
+                            ✏️ Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-danger btn-sm-custom"
+                            onClick={() => handleDeletePurchase(fp)}
+                          >
+                            🗑️ Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -694,6 +708,21 @@ export const FeedMgmt: React.FC = () => {
         .form-preview-pill strong { color: var(--color-indigo); }
 
         .color-emerald { color: var(--color-emerald); }
+        .btn-danger {
+          background: rgba(244,63,94,0.15);
+          border: 1px solid rgba(244,63,94,0.3);
+          color: var(--color-rose, #f43f5e);
+        }
+        .btn-danger:hover {
+          background: rgba(244,63,94,0.28);
+          border-color: rgba(244,63,94,0.55);
+        }
+        .action-btn-group {
+          display: flex;
+          gap: 0.4rem;
+          align-items: center;
+          flex-wrap: nowrap;
+        }
         .batch-badge {
           background: rgba(255,255,255,0.05); border: 1px solid var(--border-color);
           padding: 0.2rem 0.5rem; border-radius: var(--radius-sm); font-weight: 700; font-family: monospace; font-size: 0.85rem;
