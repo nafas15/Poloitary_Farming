@@ -58,11 +58,118 @@ export const SalesMgmt: React.FC = () => {
 
   const handleViewInvoice = (sale: Sale) => {
     setActiveInvoice(sale);
-    setAmountPaid(sale.totalAmount); // default to exact amount
+    setAmountPaid(sale.totalAmount);
     setExtraCharges([]);
     setNewChargeLabel('Transport');
     setNewChargeAmount(0);
     setIsInvoiceOpen(true);
+  };
+
+  const handlePrint = () => {
+    if (!activeInvoice) return;
+    const el = document.querySelector('.printable-invoice-container');
+    if (!el) return;
+    const invoiceHtml = (el as HTMLElement).innerHTML;
+    const totalExtras = extraCharges.reduce((s, c) => s + c.amount, 0);
+    const grandTotal = activeInvoice.totalAmount + totalExtras;
+    const change = amountPaid - grandTotal;
+
+    const pw = window.open('', '_blank', 'width=900,height=700');
+    if (!pw) return;
+    pw.document.write(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Invoice ${activeInvoice.invoiceId}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    @page { size: A4; margin: 1.5cm; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: #ffffff;
+      color: #111827;
+      font-size: 14px;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .printable-invoice-container { padding: 0; }
+    .invoice-header-branding {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      border-bottom: 2px solid #d1d5db;
+      padding-bottom: 1.2rem; margin-bottom: 1.2rem;
+    }
+    .invoice-header-branding h2 { font-size: 1.4rem; letter-spacing: 0.05em; margin: 0 0 0.25rem; color: #111827; }
+    .inv-subtitle { color: #059669; font-size: 0.78rem; margin-bottom: 0.2rem; }
+    .inv-address { font-size: 0.75rem; color: #6b7280; margin-top: 0.1rem; }
+    .invoice-id-block { text-align: right; }
+    .invoice-label { font-size: 1.2rem; font-weight: 800; color: #059669; letter-spacing: 0.1em; margin-bottom: 0.5rem; }
+    .invoice-meta-row { display: flex; gap: 0.5rem; justify-content: flex-end; font-size: 0.85rem; margin-bottom: 0.15rem; color: #374151; }
+    .invoice-addresses { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem; }
+    .address-block h5 { font-size: 0.7rem; text-transform: uppercase; color: #9ca3af; margin-bottom: 0.4rem; letter-spacing: 0.05em; }
+    .address-block p { color: #111827; font-size: 0.9rem; }
+    .inv-contact { font-size: 0.82rem; color: #6b7280; margin-top: 0.2rem; }
+    .invoice-status-block { text-align: right; }
+    .paid-badge {
+      background: #d1fae5; border: 1px solid #6ee7b7; color: #059669;
+      padding: 0.3rem 0.75rem; border-radius: 999px; font-size: 0.8rem; font-weight: 700;
+    }
+    .partial-badge {
+      background: #fef3c7; border: 1px solid #fcd34d; color: #d97706;
+      padding: 0.3rem 0.75rem; border-radius: 999px; font-size: 0.8rem; font-weight: 700;
+    }
+    .inv-paid-print-value { font-size: 0.95rem; font-weight: 700; color: #111827; display: block; margin-bottom: 0.3rem; }
+    .inv-paid-input-header { display: none; }
+    .invoice-items-table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; }
+    .invoice-items-table th {
+      background: #f3f4f6; color: #374151; border-bottom: 2px solid #9ca3af;
+      padding: 0.5rem 0; font-size: 0.75rem; text-align: left;
+    }
+    .invoice-items-table td { border-bottom: 1px solid #e5e7eb; padding: 0.85rem 0; vertical-align: top; color: #111827; }
+    .inv-item-desc { font-weight: 500; }
+    .inv-item-note { font-size: 0.75rem; color: #9ca3af; margin-top: 0.25rem; }
+    .invoice-calculations {
+      margin-left: auto; width: 320px;
+      border-top: 1px solid #d1d5db; padding-top: 1rem;
+      margin-bottom: 1.5rem; display: flex; flex-direction: column; gap: 0.4rem;
+    }
+    .calc-row { display: flex; justify-content: space-between; font-size: 0.88rem; color: #374151; }
+    .calc-row.grand-total {
+      font-size: 1rem; font-weight: 700; color: #111827;
+      border-top: 1px solid #d1d5db; padding-top: 0.5rem; margin-top: 0.25rem;
+    }
+    .charge-addition { color: #0284c7; }
+    .charge-deduction { color: #dc2626; }
+    .charge-pos-val { color: #0284c7; font-weight: 600; }
+    .charge-neg-val { color: #dc2626; font-weight: 600; }
+    .extra-charge-right { display: flex; align-items: center; gap: 0.35rem; }
+    .remove-charge-btn, .add-charge-row, .charge-sign-toggle { display: none !important; }
+    .payment-given-row {
+      color: #d97706; font-weight: 600;
+      border-top: 1px dashed #fcd34d; padding-top: 0.4rem; margin-top: 0.1rem;
+    }
+    .balance-row { font-size: 1rem; font-weight: 700; border-top: 1px solid #d1d5db; padding-top: 0.5rem; margin-top: 0.15rem; }
+    .change-positive { color: #059669; }
+    .balance-due { color: #dc2626; }
+    .invoice-footer-notes {
+      text-align: center; font-size: 0.78rem; color: #9ca3af;
+      border-top: 1px solid #e5e7eb; padding-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="printable-invoice-container">
+    ${invoiceHtml}
+  </div>
+  <script>
+    // Remove the Amount Paid input and show the plain text value
+    document.querySelectorAll('.inv-paid-input-header').forEach(el => el.remove());
+    window.onload = function() { window.print(); window.onafterprint = function() { window.close(); }; };
+  </script>
+</body>
+</html>`);
+    pw.document.close();
   };
 
   const totalRevenue = sales.reduce((s, sale) => s + sale.totalAmount, 0);
@@ -353,11 +460,11 @@ export const SalesMgmt: React.FC = () => {
       <Modal
         isOpen={isInvoiceOpen}
         onClose={() => setIsInvoiceOpen(false)}
-        title={`🧾 Invoice: ${activeInvoice?.invoiceId}`}
+        title={``}
         footer={
           <>
             <button className="btn btn-secondary" onClick={() => setIsInvoiceOpen(false)}>Close</button>
-            <button className="btn btn-primary" onClick={() => window.print()}>🖨️ Print Invoice</button>
+            <button className="btn btn-primary" onClick={handlePrint}>🖨️ Print Invoice</button>
           </>
         }
       >
@@ -365,9 +472,10 @@ export const SalesMgmt: React.FC = () => {
           <div className="printable-invoice-container print-invoice">
             <div className="invoice-header-branding">
               <div>
-                <h2>AKSHA FARM ERP</h2>
+                <h2>AKSHA FARM</h2>
                 <p className="inv-subtitle">Premium Poultry Farm Management</p>
-                <p className="inv-address">Kekunagoll, Kurunegala</p>
+                <p className="inv-address">423/1, Kekunagolla, Kekunagolla</p>
+                <p className="inv-address">📞 +94768470361</p>
               </div>
               <div className="invoice-id-block">
                 <div className="invoice-label">INVOICE</div>
@@ -449,8 +557,7 @@ export const SalesMgmt: React.FC = () => {
                       onClick={() => {
                         const updated = extraCharges.filter((_, idx) => idx !== i);
                         setExtraCharges(updated);
-                        const newGrandTotal = (activeInvoice?.totalAmount ?? 0) + updated.reduce((s, x) => s + x.amount, 0);
-                        setAmountPaid(newGrandTotal);
+                        // Do NOT override amountPaid — user may have already set a custom value
                       }}
                       title="Remove charge"
                     >✕</button>
@@ -502,8 +609,7 @@ export const SalesMgmt: React.FC = () => {
                       const newCharge = { label: newChargeLabel, amount: newChargeAmount };
                       const updated = [...extraCharges, newCharge];
                       setExtraCharges(updated);
-                      const newGrandTotal = (activeInvoice?.totalAmount ?? 0) + updated.reduce((s, c) => s + c.amount, 0);
-                      setAmountPaid(newGrandTotal);
+                      // Do NOT override amountPaid — user may have already set a custom value
                       setNewChargeAmount(0);
                     }
                   }}
@@ -540,7 +646,7 @@ export const SalesMgmt: React.FC = () => {
             </div>
 
             <div className="invoice-footer-notes">
-              <p>Thank you for your business! Health certificates attached for live bird shipments.</p>
+              <p>Thank you for your business!</p>
             </div>
           </div>
         )}
@@ -849,11 +955,19 @@ export const SalesMgmt: React.FC = () => {
           border-top: 1px solid var(--border-color); padding-top: var(--spacing-md);
         }
 
+        @page {
+          margin: 1.2cm;
+          /* Suppress browser-generated header/footer (URL, page number) */
+          size: A4;
+        }
         @media print {
           .add-charge-row { display: none !important; }
           .remove-charge-btn { display: none !important; }
           .inv-paid-input-header { display: none !important; }
           .inv-paid-print-value { display: block !important; }
+          .charge-sign-toggle { display: none !important; }
+          /* Hide browser default running head/foot */
+          html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
         .inv-paid-print-value { display: none; font-size: 0.95rem; font-weight: 700; color: #e2e8f0; }
       `}</style>

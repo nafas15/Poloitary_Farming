@@ -409,47 +409,87 @@ tr:hover td {
   to { transform: translateY(0); opacity: 1; }
 }
 
-/* Print Styles */
-@media print {
-  body {
-    background: #ffffff !important;
-    color: #000000 !important;
-    font-size: 12pt;
-  }
-  
-  .sidebar, .header, .btn, .no-print {
-    display: none !important;
-  }
-  
-  .main-content {
-    margin-left: 0 !important;
-    padding: 0 !important;
-  }
-  
-  .glass-card {
-    background: none !important;
-    border: none !important;
-    box-shadow: none !important;
-    padding: 0 !important;
-  }
-  
-  .print-invoice {
-    display: block !important;
-    color: #000000 !important;
-  }
-  
-  .table-wrapper {
-    border: none !important;
-  }
-  
-  th {
-    background: #f3f4f6 !important;
-    color: #000000 !important;
-    border-bottom: 2px solid #000000 !important;
-  }
-  
-  td {
-    border-bottom: 1px solid #e5e7eb !important;
-    color: #000000 !important;
-  }
+/* Print Styles — Invoice Only */
+@page {
+  size: A4;
+  margin: 1.5cm;
 }
+
+@media print {
+  /* Hide EVERYTHING by default */
+  body * {
+    visibility: hidden !important;
+  }
+
+  /* Then show ONLY the invoice container and all its children */
+  .printable-invoice-container,
+  .printable-invoice-container * {
+    visibility: visible !important;
+  }
+
+  /* Position the invoice to fill the page */
+  .printable-invoice-container {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    background: #ffffff !important;
+    color: #111827 !important;
+    padding: 0 !important;
+    z-index: 99999 !important;
+  }
+
+  /* Clean white/black colours for print */
+  .printable-invoice-container h2,
+  .printable-invoice-container h5,
+  .printable-invoice-container strong,
+  .printable-invoice-container span,
+  .printable-invoice-container p,
+  .printable-invoice-container td,
+  .printable-invoice-container th,
+  .printable-invoice-container div {
+    color: #111827 !important;
+    background: transparent !important;
+    border-color: #d1d5db !important;
+    -webkit-text-fill-color: #111827 !important;
+  }
+
+  .inv-subtitle { color: #059669 !important; }
+  .inv-address, .inv-contact, .inv-item-note { color: #6b7280 !important; }
+  .invoice-label { color: #059669 !important; }
+  .paid-badge { color: #059669 !important; background: #d1fae5 !important; border-color: #6ee7b7 !important; }
+  .partial-badge { color: #d97706 !important; background: #fef3c7 !important; border-color: #fcd34d !important; }
+  .charge-neg-val, .charge-deduction { color: #dc2626 !important; }
+  .charge-pos-val, .charge-addition { color: #0284c7 !important; }
+  .grand-total { color: #111827 !important; }
+  .balance-due { color: #dc2626 !important; }
+  .change-positive { color: #059669 !important; }
+  .payment-given-row { color: #d97706 !important; }
+  .inv-paid-print-value { color: #111827 !important; display: block !important; }
+
+  /* Hide interactive-only elements */
+  .add-charge-row,
+  .remove-charge-btn,
+  .charge-sign-toggle,
+  .inv-paid-input-header,
+  .invoice-footer-notes { display: block !important; } /* keep footer note */
+
+  .add-charge-row,
+  .remove-charge-btn,
+  .charge-sign-toggle,
+  .inv-paid-input-header { display: none !important; }
+
+  /* Table styling for print */
+  .invoice-items-table th {
+    background: #f3f4f6 !important;
+    color: #374151 !important;
+    border-bottom: 2px solid #9ca3af !important;
+  }
+  .invoice-items-table td {
+    border-bottom: 1px solid #e5e7eb !important;
+  }
+
+  /* Ensure colours render */
+  html { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+}
+

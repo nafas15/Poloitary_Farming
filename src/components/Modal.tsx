@@ -35,15 +35,25 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
   return (
     <div className="modal-overlay" onClick={handleOverlayClick}>
       <div className="modal-content glass-card">
-        <div className="modal-header">
-          <h3>{title}</h3>
-          <button className="modal-close-btn" onClick={onClose} aria-label="Close modal">
+        {title && (
+          <div className="modal-header">
+            <h3>{title}</h3>
+            <button className="modal-close-btn" onClick={onClose} aria-label="Close modal">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" x2="6" y1="6" y2="18" />
+                <line x1="6" x2="18" y1="6" y2="18" />
+              </svg>
+            </button>
+          </div>
+        )}
+        {!title && (
+          <button className="modal-close-btn modal-close-floating" onClick={onClose} aria-label="Close modal">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" x2="6" y1="6" y2="18" />
               <line x1="6" x2="18" y1="6" y2="18" />
             </svg>
           </button>
-        </div>
+        )}
         <div className="modal-body">
           {children}
         </div>
@@ -71,6 +81,13 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
         .modal-close-btn:hover {
           color: var(--color-rose);
           background: var(--color-rose-glow);
+        }
+
+        .modal-close-floating {
+          position: absolute;
+          top: 0.75rem;
+          right: 0.75rem;
+          z-index: 10;
         }
 
         .modal-body {
