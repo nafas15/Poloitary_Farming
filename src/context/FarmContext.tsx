@@ -88,6 +88,8 @@ export interface Sale {
   totalAmount: number;
   batchId?: string; // If bird sale
   details?: string;
+  weightKg?: number;
+  pricePerKg?: number;
 }
 
 export type ExpenseCategory = 'Feed' | 'Medicine' | 'Electricity' | 'Labor' | 'Water' | 'Other';
@@ -116,7 +118,16 @@ interface FarmContextType {
   batches: BirdBatch[];
   addBatch: (batch: Omit<BirdBatch, 'currentQuantity' | 'mortalityLogs' | 'status'>) => void;
   deleteBatch: (batchId: string) => void;
-  sellBatch: (batchId: string, quantity: number, pricePerBird: number, customerName: string, customerContact: string) => void;
+  sellBatch: (
+    batchId: string,
+    quantity: number,
+    pricePerBird: number,
+    customerName: string,
+    customerContact: string,
+    weightKg?: number,
+    pricePerKg?: number,
+    totalAmount?: number
+  ) => void;
   logMortality: (batchId: string, quantity: number, reason: string, date: string) => void;
   feedPurchases: FeedPurchase[];
   addFeedPurchase: (purchase: Omit<FeedPurchase, 'id'>) => void;
@@ -304,7 +315,9 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
         unitPrice: Number(s.unit_price),
         totalAmount: Number(s.total_amount),
         batchId: s.batch_id || undefined,
-        details: s.details || undefined
+        details: s.details || undefined,
+        weightKg: s.weight_kg ? Number(s.weight_kg) : undefined,
+        pricePerKg: s.price_per_kg ? Number(s.price_per_kg) : undefined
       })));
 
       // Map Expenses
@@ -441,7 +454,10 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
     quantity: number,
     pricePerBird: number,
     customerName: string,
-    customerContact: string
+    customerContact: string,
+    weightKg?: number,
+    pricePerKg?: number,
+    totalAmount?: number
   ) => {
     try {
       const { data: batch } = await supabase
@@ -455,9 +471,11 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const newCurrentQty = Math.max(0, batch.current_quantity - quantity);
       const newStatus = newCurrentQty === 0 ? 'Sold' : 'Active';
 
+      const computedTotal = totalAmount ?? (weightKg && pricePerKg ? weightKg * pricePerKg : quantity * pricePerBird);
+
       const saleId = `s-${Date.now()}`;
       const invoiceNum = `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
-      const newSale = {
+      const newSale: any = {
         id: saleId,
         invoice_id: invoiceNum,
         type: 'Bird',
@@ -466,18 +484,42 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
         customer_contact: customerContact,
         quantity,
         unit_price: pricePerBird,
-        total_amount: quantity * pricePerBird,
+        total_amount: computedTotal,
         batch_id: batchId,
-        details: `Sold ${quantity} birds from Batch ${batchId}`
+        details: `Sold ${quantity} birds from Batch ${batchId}${weightKg ? ` (${weightKg} kg @ Rs ${pricePerKg}/kg)` : ''}`,
+        weight_kg: weightKg || null,
+        price_per_kg: pricePerKg || null
       };
 
-      await Promise.all([
-        supabase
+      try {
+        const { error: saleErr } = await supabase.from('sales').insert(newSale);
+        if (saleErr) {
+          if (saleErr.code === 'PGRST204' || saleErr.message?.includes('weight_kg') || saleErr.message?.includes('schema cache')) {
+            console.warn("Supabase schema cache missing weight_kg columns. Retrying without weight columns.");
+            alert("Notice: Weight-based columns (weight_kg, price_per_kg) do not exist in your Supabase sales table. The sale will be saved as a standard bird sale. Please run the SQL migration at the bottom of schema.sql.");
+            
+            delete newSale.weight_kg;
+            delete newSale.price_per_kg;
+            newSale.total_amount = quantity * pricePerBird;
+            
+            const { error: retryErr } = await supabase.from('sales').insert(newSale);
+            if (retryErr) throw retryErr;
+          } else {
+            throw saleErr;
+          }
+        }
+
+        await supabase
           .from('batches')
           .update({ current_quantity: newCurrentQty, status: newStatus })
-          .eq('id', batchId),
-        supabase.from('sales').insert(newSale)
-      ]);
+          .eq('id', batchId);
+
+      } catch (err: any) {
+        console.error('Failed to save sale:', err);
+        alert(`Error completing sale: ${err.message || err}`);
+      }
+
+      fetchAllData();
     } catch (err) {
       console.error('Failed to sell batch:', err);
     }
@@ -1072,7 +1114,9 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
         unit_price: updated.unitPrice,
         total_amount: updated.totalAmount,
         batch_id: updated.batchId || null,
-        details: updated.details || null
+        details: updated.details || null,
+        weight_kg: updated.weightKg || null,
+        price_per_kg: updated.pricePerKg || null
       };
       
       operations.push(

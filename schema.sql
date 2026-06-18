@@ -84,7 +84,9 @@ CREATE TABLE IF NOT EXISTS sales (
     unit_price NUMERIC NOT NULL,
     total_amount NUMERIC NOT NULL,
     batch_id TEXT REFERENCES batches(id) ON DELETE SET NULL,
-    details TEXT
+    details TEXT,
+    weight_kg NUMERIC,
+    price_per_kg NUMERIC
 );
 
 -- 9. Expenses Table
@@ -143,4 +145,6 @@ ALTER PUBLICATION supabase_realtime ADD TABLE expenses;
 -- =========================================================================
 ALTER TABLE batches ADD COLUMN IF NOT EXISTS initial_quantity_kg NUMERIC;
 ALTER TABLE batches ADD COLUMN IF NOT EXISTS purchase_price_per_kg NUMERIC;
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS weight_kg NUMERIC;
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS price_per_kg NUMERIC;
 

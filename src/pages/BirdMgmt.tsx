@@ -76,6 +76,8 @@ export const BirdMgmt: React.FC = () => {
   const [sellBatchId, setSellBatchId] = useState('');
   const [sellQty, setSellQty] = useState<number>(100);
   const [sellUnitPrice, setSellUnitPrice] = useState<number>(0);
+  const [sellWeightKg, setSellWeightKg] = useState<number>(0);
+  const [sellPricePerKg, setSellPricePerKg] = useState<number>(0);
   const [sellCustomer, setSellCustomer] = useState('');
   const [sellContact, setSellContact] = useState('');
 
@@ -143,11 +145,33 @@ export const BirdMgmt: React.FC = () => {
       alert(`Insufficient birds. Only ${batch?.currentQuantity ?? 0} remaining in Batch ${sellBatchId}.`);
       return;
     }
-    sellBatch(sellBatchId, sellQty, sellUnitPrice, sellCustomer, sellContact);
+
+    const isBroiler = batch.type === 'Broiler';
+    const computedUnitPrice = isBroiler && sellWeightKg && sellPricePerKg
+      ? (sellWeightKg * sellPricePerKg) / sellQty
+      : sellUnitPrice;
+
+    const computedTotal = isBroiler && sellWeightKg && sellPricePerKg
+      ? sellWeightKg * sellPricePerKg
+      : sellQty * sellUnitPrice;
+
+    sellBatch(
+      sellBatchId, 
+      sellQty, 
+      computedUnitPrice, 
+      sellCustomer, 
+      sellContact,
+      isBroiler ? sellWeightKg : undefined,
+      isBroiler ? sellPricePerKg : undefined,
+      computedTotal
+    );
+
     // Reset and Close
     setSellBatchId('');
     setSellQty(100);
     setSellUnitPrice(0);
+    setSellWeightKg(0);
+    setSellPricePerKg(0);
     setSellCustomer('');
     setSellContact('');
     setIsSellModalOpen(false);
@@ -183,6 +207,12 @@ export const BirdMgmt: React.FC = () => {
             className="btn btn-secondary"
             onClick={() => {
               setSellBatchId('');
+              setSellQty(100);
+              setSellUnitPrice(0);
+              setSellWeightKg(0);
+              setSellPricePerKg(0);
+              setSellCustomer('');
+              setSellContact('');
               setIsSellModalOpen(true);
             }}
           >
@@ -257,6 +287,12 @@ export const BirdMgmt: React.FC = () => {
                               style={{ color: 'var(--color-emerald)', borderColor: 'rgba(16, 185, 129, 0.3)' }}
                               onClick={() => {
                                 setSellBatchId(batch.id);
+                                setSellQty(100);
+                                setSellUnitPrice(0);
+                                setSellWeightKg(0);
+                                setSellPricePerKg(0);
+                                setSellCustomer('');
+                                setSellContact('');
                                 setIsSellModalOpen(true);
                               }}
                             >
@@ -333,6 +369,12 @@ export const BirdMgmt: React.FC = () => {
                               style={{ color: 'var(--color-emerald)', borderColor: 'rgba(16, 185, 129, 0.3)' }}
                               onClick={() => {
                                 setSellBatchId(batch.id);
+                                setSellQty(100);
+                                setSellUnitPrice(0);
+                                setSellWeightKg(0);
+                                setSellPricePerKg(0);
+                                setSellCustomer('');
+                                setSellContact('');
                                 setIsSellModalOpen(true);
                               }}
                             >
@@ -617,37 +659,89 @@ export const BirdMgmt: React.FC = () => {
             )}
           </div>
 
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">Quantity to Sell</label>
-              <input
-                type="number"
-                min="1"
-                max={selectedSellBatch?.currentQuantity ?? undefined}
-                className="form-control"
-                value={sellQty}
-                onChange={e => setSellQty(Number(e.target.value))}
-                required
-              />
-              {selectedSellBatch && (
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                  Max: {selectedSellBatch.currentQuantity.toLocaleString()} birds
-                </span>
-              )}
+          {selectedSellBatch?.type === 'Broiler' ? (
+            <>
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Number of Birds to Sell</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max={selectedSellBatch?.currentQuantity ?? undefined}
+                    className="form-control"
+                    value={sellQty}
+                    onChange={e => setSellQty(Number(e.target.value))}
+                    required
+                  />
+                  {selectedSellBatch && (
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                      Max: {selectedSellBatch.currentQuantity.toLocaleString()} birds
+                    </span>
+                  )}
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Total Weight sold (Kg)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    className="form-control"
+                    value={sellWeightKg || ''}
+                    onChange={e => setSellWeightKg(Number(e.target.value))}
+                    placeholder="e.g. 150.5"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Price per Kg (Rs)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    className="form-control"
+                    value={sellPricePerKg || ''}
+                    onChange={e => setSellPricePerKg(Number(e.target.value))}
+                    placeholder="e.g. 180"
+                    required
+                  />
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Quantity to Sell</label>
+                <input
+                  type="number"
+                  min="1"
+                  max={selectedSellBatch?.currentQuantity ?? undefined}
+                  className="form-control"
+                  value={sellQty}
+                  onChange={e => setSellQty(Number(e.target.value))}
+                  required
+                />
+                {selectedSellBatch && (
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                    Max: {selectedSellBatch.currentQuantity.toLocaleString()} birds
+                  </span>
+                )}
+              </div>
+              <div className="form-group">
+                <label className="form-label">Price per Bird (Rs)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  className="form-control"
+                  value={sellUnitPrice}
+                  onChange={e => setSellUnitPrice(Number(e.target.value))}
+                  required
+                />
+              </div>
             </div>
-            <div className="form-group">
-              <label className="form-label">Price per Bird (Rs)</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0.01"
-                className="form-control"
-                value={sellUnitPrice}
-                onChange={e => setSellUnitPrice(Number(e.target.value))}
-                required
-              />
-            </div>
-          </div>
+          )}
 
           <div className="form-row">
             <div className="form-group">
@@ -676,14 +770,43 @@ export const BirdMgmt: React.FC = () => {
             </div>
           </div>
 
-          {sellQty > 0 && sellUnitPrice > 0 && (
+          {sellQty > 0 && (selectedSellBatch?.type === 'Broiler' ? (sellWeightKg > 0 && sellPricePerKg > 0) : (sellUnitPrice > 0)) && (
             <div className="sell-summary-preview">
-              <div className="sell-summary-row"><span>Quantity</span><strong>{sellQty.toLocaleString()} birds</strong></div>
-              <div className="sell-summary-row"><span>Unit Price</span><strong>Rs {sellUnitPrice.toFixed(2)}/bird</strong></div>
-              <div className="sell-summary-row sell-summary-total">
-                <span>Invoice Total</span>
-                <strong>Rs {(sellQty * sellUnitPrice).toFixed(2)}</strong>
+              <div className="sell-summary-row">
+                <span>Quantity</span>
+                <strong>{sellQty.toLocaleString()} birds</strong>
               </div>
+              {selectedSellBatch?.type === 'Broiler' ? (
+                <>
+                  <div className="sell-summary-row">
+                    <span>Total Weight</span>
+                    <strong>{sellWeightKg.toLocaleString()} kg</strong>
+                  </div>
+                  <div className="sell-summary-row">
+                    <span>Price per Kg</span>
+                    <strong>Rs {sellPricePerKg.toFixed(2)}/kg</strong>
+                  </div>
+                  <div className="sell-summary-row" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    <span>Implied Unit Price</span>
+                    <span>Rs {((sellWeightKg * sellPricePerKg) / sellQty).toFixed(2)}/bird</span>
+                  </div>
+                  <div className="sell-summary-row sell-summary-total">
+                    <span>Invoice Total</span>
+                    <strong>Rs {(sellWeightKg * sellPricePerKg).toFixed(2)}</strong>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="sell-summary-row">
+                    <span>Unit Price</span>
+                    <strong>Rs {sellUnitPrice.toFixed(2)}/bird</strong>
+                  </div>
+                  <div className="sell-summary-row sell-summary-total">
+                    <span>Invoice Total</span>
+                    <strong>Rs {(sellQty * sellUnitPrice).toFixed(2)}</strong>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </form>

@@ -43,6 +43,8 @@ export const SalesMgmt: React.FC = () => {
   const [editSaleCustomerContact, setEditSaleCustomerContact] = useState('');
   const [editSaleQty, setEditSaleQty] = useState<number>(0);
   const [editSaleUnitPrice, setEditSaleUnitPrice] = useState<number>(0);
+  const [editSaleWeightKg, setEditSaleWeightKg] = useState<number>(0);
+  const [editSalePricePerKg, setEditSalePricePerKg] = useState<number>(0);
   const [editSaleBatchId, setEditSaleBatchId] = useState('');
   const [editSaleDetails, setEditSaleDetails] = useState('');
 
@@ -54,6 +56,8 @@ export const SalesMgmt: React.FC = () => {
     setEditSaleCustomerContact(s.customerContact);
     setEditSaleQty(s.quantity);
     setEditSaleUnitPrice(s.unitPrice);
+    setEditSaleWeightKg(s.weightKg || 0);
+    setEditSalePricePerKg(s.pricePerKg || 0);
     setEditSaleBatchId(s.batchId || '');
     setEditSaleDetails(s.details || '');
     setIsEditSaleModalOpen(true);
@@ -62,16 +66,24 @@ export const SalesMgmt: React.FC = () => {
   const handleEditSaleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingSaleId) return;
+
+    const isBroilerSale = editSaleType === 'Bird' && editSaleWeightKg > 0;
+    const finalTotalAmount = isBroilerSale
+      ? Number(editSaleWeightKg) * Number(editSalePricePerKg)
+      : Number(editSaleQty) * Number(editSaleUnitPrice);
+
     await updateSale(editingSaleId, {
       type: editSaleType,
       date: editSaleDate,
       customerName: editSaleCustomerName,
       customerContact: editSaleCustomerContact,
       quantity: Number(editSaleQty),
-      unitPrice: Number(editSaleUnitPrice),
-      totalAmount: Number(editSaleQty) * Number(editSaleUnitPrice),
+      unitPrice: isBroilerSale ? finalTotalAmount / Number(editSaleQty) : Number(editSaleUnitPrice),
+      totalAmount: finalTotalAmount,
       batchId: editSaleType === 'Bird' ? editSaleBatchId : undefined,
-      details: editSaleDetails
+      details: editSaleDetails,
+      weightKg: isBroilerSale ? Number(editSaleWeightKg) : undefined,
+      pricePerKg: isBroilerSale ? Number(editSalePricePerKg) : undefined
     });
     setIsEditSaleModalOpen(false);
   };
@@ -343,8 +355,26 @@ export const SalesMgmt: React.FC = () => {
                               {s.type === 'Bird' ? '🐔 Bird' : '🥚 Egg'}
                             </span>
                           </td>
-                          <td>{s.quantity.toLocaleString()} {s.type === 'Bird' ? 'birds' : 'eggs'}</td>
-                          <td>Rs {s.unitPrice.toFixed(2)}</td>
+                          <td>
+                            {s.quantity.toLocaleString()} {s.type === 'Bird' ? 'birds' : 'eggs'}
+                            {s.type === 'Bird' && s.weightKg && (
+                              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
+                                ({s.weightKg.toLocaleString()} kg)
+                              </div>
+                            )}
+                          </td>
+                          <td>
+                            {s.type === 'Bird' && s.weightKg && s.pricePerKg ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                                <span>Rs {s.pricePerKg.toFixed(2)} / kg</span>
+                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                                  (Rs {s.unitPrice.toFixed(2)} / bird)
+                                </span>
+                              </div>
+                            ) : (
+                              `Rs ${s.unitPrice.toFixed(2)}`
+                            )}
+                          </td>
                           <td>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', alignItems: 'flex-start' }}>
                               <strong className="revenue-amount">Rs {s.totalAmount.toFixed(2)}</strong>
@@ -446,24 +476,45 @@ export const SalesMgmt: React.FC = () => {
             </div>
           </div>
 
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">Quantity ({editSaleType === 'Bird' ? 'birds' : 'eggs'})</label>
-              <input type="number" min="1" className="form-control" value={editSaleQty} onChange={e => setEditSaleQty(Number(e.target.value))} required />
+          {editSaleType === 'Bird' && (batches.find(b => b.id === editSaleBatchId)?.type === 'Broiler' || editSaleWeightKg > 0) ? (
+            <>
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Number of Birds Sold</label>
+                  <input type="number" min="1" className="form-control" value={editSaleQty} onChange={e => setEditSaleQty(Number(e.target.value))} required />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Total Weight (Kg)</label>
+                  <input type="number" step="0.01" min="0.01" className="form-control" value={editSaleWeightKg || ''} onChange={e => setEditSaleWeightKg(Number(e.target.value))} required />
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Price per Kg (Rs)</label>
+                  <input type="number" step="0.01" min="0.01" className="form-control" value={editSalePricePerKg || ''} onChange={e => setEditSalePricePerKg(Number(e.target.value))} required />
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Quantity ({editSaleType === 'Bird' ? 'birds' : 'eggs'})</label>
+                <input type="number" min="1" className="form-control" value={editSaleQty} onChange={e => setEditSaleQty(Number(e.target.value))} required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Price per {editSaleType === 'Bird' ? 'Bird' : 'Egg'} (Rs)</label>
+                <input type="number" step="0.01" min="0.01" className="form-control" value={editSaleUnitPrice} onChange={e => setEditSaleUnitPrice(Number(e.target.value))} required />
+              </div>
             </div>
-            <div className="form-group">
-              <label className="form-label">Price per {editSaleType === 'Bird' ? 'Bird' : 'Egg'} (Rs)</label>
-              <input type="number" step="0.01" min="0.01" className="form-control" value={editSaleUnitPrice} onChange={e => setEditSaleUnitPrice(Number(e.target.value))} required />
-            </div>
-          </div>
+          )}
 
           {editSaleType === 'Bird' && (
             <div className="form-group">
               <label className="form-label">Target Batch ID</label>
               <select className="form-control" value={editSaleBatchId} onChange={e => setEditSaleBatchId(e.target.value)} required>
-                <option value="">Select active batch...</option>
-                {batches.filter(b => b.status === 'Active').map(b => (
-                  <option key={b.id} value={b.id}>{b.id} — {b.type} ({b.currentQuantity.toLocaleString()} birds available)</option>
+                <option value="">Select batch...</option>
+                {batches.map(b => (
+                  <option key={b.id} value={b.id}>{b.id} — {b.type} ({b.status === 'Active' ? `${b.currentQuantity.toLocaleString()} available` : 'Sold'})</option>
                 ))}
               </select>
             </div>
@@ -474,7 +525,7 @@ export const SalesMgmt: React.FC = () => {
             <input type="text" className="form-control" value={editSaleDetails} onChange={e => setEditSaleDetails(e.target.value)} maxLength={256} />
           </div>
 
-          {editSaleQty > 0 && editSaleUnitPrice > 0 && (
+          {editSaleQty > 0 && (editSaleType === 'Bird' && (batches.find(b => b.id === editSaleBatchId)?.type === 'Broiler' || editSaleWeightKg > 0) ? (editSaleWeightKg > 0 && editSalePricePerKg > 0) : (editSaleUnitPrice > 0)) && (
             <div className="sm-order-summary" style={{
               background: 'rgba(16,185,129,0.05)',
               border: '1px solid rgba(16,185,129,0.15)',
@@ -485,10 +536,31 @@ export const SalesMgmt: React.FC = () => {
               gap: '0.4rem',
               marginTop: '0.5rem'
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
-                <span>Subtotal</span>
-                <strong>Rs {(editSaleQty * editSaleUnitPrice).toFixed(2)}</strong>
-              </div>
+              {editSaleType === 'Bird' && (batches.find(b => b.id === editSaleBatchId)?.type === 'Broiler' || editSaleWeightKg > 0) ? (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
+                    <span>Total Weight</span>
+                    <strong>{editSaleWeightKg.toLocaleString()} kg</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
+                    <span>Price per Kg</span>
+                    <strong>Rs {editSalePricePerKg.toFixed(2)}/kg</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    <span>Implied Unit Price</span>
+                    <span>Rs {((editSaleWeightKg * editSalePricePerKg) / editSaleQty).toFixed(2)}/bird</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1rem', fontWeight: '700', color: 'var(--color-emerald)', borderTop: '1px solid rgba(16,185,129,0.2)', paddingTop: '0.4rem', marginTop: '0.2rem' }}>
+                    <span>Subtotal</span>
+                    <strong>Rs {(editSaleWeightKg * editSalePricePerKg).toFixed(2)}</strong>
+                  </div>
+                </>
+              ) : (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
+                  <span>Subtotal</span>
+                  <strong>Rs {(editSaleQty * editSaleUnitPrice).toFixed(2)}</strong>
+                </div>
+              )}
             </div>
           )}
         </form>
@@ -567,12 +639,35 @@ export const SalesMgmt: React.FC = () => {
                         ? `Live Poultry Birds (Batch: ${activeInvoice.batchId})`
                         : 'Fresh Eggs'}
                     </div>
+                    {activeInvoice.weightKg && (
+                      <div className="inv-item-note">
+                        Weight-based sale: {activeInvoice.weightKg.toLocaleString()} kg
+                      </div>
+                    )}
                     {activeInvoice.details && (
                       <div className="inv-item-note">{activeInvoice.details}</div>
                     )}
                   </td>
-                  <td>{activeInvoice.quantity.toLocaleString()} {activeInvoice.type === 'Bird' ? 'birds' : 'eggs'}</td>
-                  <td>Rs {activeInvoice.unitPrice.toFixed(2)}</td>
+                  <td>
+                    {activeInvoice.quantity.toLocaleString()} {activeInvoice.type === 'Bird' ? 'birds' : 'eggs'}
+                    {activeInvoice.weightKg && (
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
+                        ({activeInvoice.weightKg.toLocaleString()} kg total)
+                      </div>
+                    )}
+                  </td>
+                  <td>
+                    {activeInvoice.weightKg && activeInvoice.pricePerKg ? (
+                      <>
+                        Rs {activeInvoice.pricePerKg.toFixed(2)} / kg
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
+                          (Rs {activeInvoice.unitPrice.toFixed(2)} / bird)
+                        </div>
+                      </>
+                    ) : (
+                      `Rs ${activeInvoice.unitPrice.toFixed(2)}`
+                    )}
+                  </td>
                   <td><strong>Rs {activeInvoice.totalAmount.toFixed(2)}</strong></td>
                 </tr>
               </tbody>
