@@ -183,14 +183,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
           position: fixed;
           left: 0;
           top: 0;
-          background: rgba(18, 24, 36, 0.85);
+          background: var(--sidebar-bg);
           backdrop-filter: blur(20px);
           -webkit-backdrop-filter: blur(20px);
           border-right: 1px solid var(--border-color);
           display: flex;
           flex-direction: column;
           z-index: 100;
-          transition: width var(--transition-normal);
+          transition: width var(--transition-normal), background var(--transition-normal), border-color var(--transition-normal);
         }
 
         .sidebar-logo {
@@ -252,7 +252,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
         }
 
         .menu-item:hover {
-          background: rgba(255, 255, 255, 0.04);
+          background: var(--glass-button-bg);
           color: var(--text-primary);
         }
 
@@ -277,7 +277,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
           display: flex;
           align-items: center;
           justify-content: space-between;
-          background: rgba(10, 14, 23, 0.4);
+          background: var(--glass-bg);
+          transition: background-color var(--transition-normal), border-color var(--transition-normal);
         }
 
         .user-profile {
@@ -360,7 +361,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
 
         .sidebar-close-btn:hover {
           color: var(--text-primary);
-          background: rgba(255, 255, 255, 0.05);
+          background: var(--glass-button-hover);
         }
 
         @keyframes fadeIn {
@@ -425,9 +426,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
             bottom: 0;
             width: 260px !important;
             transform: translateX(-100%);
-            transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
+            transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), background-color var(--transition-normal) !important;
             z-index: 1000;
-            background: #111827;
+            background: var(--bg-secondary);
             box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5);
           }
 

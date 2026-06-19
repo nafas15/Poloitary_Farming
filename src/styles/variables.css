@@ -24,6 +24,25 @@
   --text-secondary: #9ca3af;
   --text-muted: #6b7280;
   
+  /* Gradients & Theme Adaptations */
+  --bg-gradient-start: #1e2640;
+  --text-gradient-start: #ffffff;
+  --text-gradient-end: #a5b4fc;
+  
+  /* Glass Elements Defaults */
+  --glass-bg: rgba(22, 31, 48, 0.4);
+  --glass-button-bg: rgba(255, 255, 255, 0.05);
+  --glass-button-hover: rgba(255, 255, 255, 0.1);
+  --sidebar-bg: rgba(18, 24, 36, 0.85);
+
+  /* Alert Colors Defaults */
+  --alert-danger-color: #fca5a5;
+  --alert-warning-color: #fde047;
+  --alert-info-color: #a5f3fc;
+  --alert-danger-bg: rgba(244, 63, 94, 0.06);
+  --alert-warning-bg: rgba(245, 158, 11, 0.06);
+  --alert-info-bg: rgba(6, 182, 212, 0.06);
+  
   /* Fonts */
   --font-family: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   
@@ -46,3 +65,54 @@
   --card-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
   --glow-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
 }
+
+.light-mode {
+  /* Color Palette (Sleek Light Glassmorphism) */
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --bg-card: rgba(255, 255, 255, 0.7);
+  --bg-card-hover: rgba(255, 255, 255, 0.85);
+  --border-color: rgba(0, 0, 0, 0.08);
+  --border-color-hover: rgba(0, 0, 0, 0.16);
+  
+  /* Accent Colors (Slightly deeper for readability on light BG) */
+  --color-emerald: #059669;
+  --color-emerald-glow: rgba(5, 150, 105, 0.1);
+  --color-amber: #d97706;
+  --color-amber-glow: rgba(217, 119, 6, 0.1);
+  --color-cyan: #0891b2;
+  --color-cyan-glow: rgba(8, 145, 178, 0.1);
+  --color-rose: #e11d48;
+  --color-rose-glow: rgba(225, 29, 72, 0.1);
+  --color-indigo: #4f46e5;
+  --color-indigo-glow: rgba(79, 70, 229, 0.1);
+  
+  /* Text Colors */
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+  
+  /* UI Shadows & Glows */
+  --card-shadow: 0 8px 32px 0 rgba(15, 23, 42, 0.06);
+  --glow-shadow: 0 0 20px rgba(5, 150, 105, 0.08);
+  
+  /* Gradients & Theme Adaptations */
+  --bg-gradient-start: #e2e8f0;
+  --text-gradient-start: #0f172a;
+  --text-gradient-end: #3b82f6;
+
+  /* Glass Elements Overrides */
+  --glass-bg: rgba(255, 255, 255, 0.55);
+  --glass-button-bg: rgba(0, 0, 0, 0.04);
+  --glass-button-hover: rgba(0, 0, 0, 0.08);
+  --sidebar-bg: rgba(255, 255, 255, 0.85);
+
+  /* Alert Colors Overrides */
+  --alert-danger-color: #b91c1c;
+  --alert-warning-color: #b45309;
+  --alert-info-color: #0369a1;
+  --alert-danger-bg: rgba(244, 63, 94, 0.08);
+  --alert-warning-bg: rgba(245, 158, 11, 0.08);
+  --alert-info-bg: rgba(6, 182, 212, 0.08);
+}
+

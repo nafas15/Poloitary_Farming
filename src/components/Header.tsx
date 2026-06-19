@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useFarm } from '../context/FarmContext';
+import { useTheme } from '../context/ThemeContext';
 
 interface HeaderProps {
   activeTab: string;
@@ -8,6 +9,7 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ activeTab, toggleSidebar }) => {
   const { batches, sales, expenses, currentUser } = useFarm();
+  const { theme, toggleTheme } = useTheme();
   const [time, setTime] = useState(new Date());
 
   useEffect(() => {
@@ -67,6 +69,31 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, toggleSidebar }) => {
       </div>
 
       <div className="header-right">
+        <button 
+          className="theme-toggle-btn" 
+          onClick={toggleTheme} 
+          aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+          title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+        >
+          {theme === 'dark' ? (
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="4" />
+              <path d="M12 2v2" />
+              <path d="M12 20v2" />
+              <path d="m4.93 4.93 1.41 1.41" />
+              <path d="m17.66 17.66 1.41 1.41" />
+              <path d="M2 12h2" />
+              <path d="M20 12h2" />
+              <path d="m6.34 17.66-1.41 1.41" />
+              <path d="m19.07 4.93-1.41 1.41" />
+            </svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+            </svg>
+          )}
+        </button>
+
         <div className="header-stat">
           <div className="stat-icon birds">🐤</div>
           <div className="stat-info">
@@ -106,7 +133,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, toggleSidebar }) => {
 
         .sidebar-toggle-btn {
           display: none;
-          background: rgba(255, 255, 255, 0.05);
+          background: var(--glass-button-bg);
           border: 1px solid var(--border-color);
           color: var(--text-primary);
           padding: 0.5rem;
@@ -118,7 +145,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, toggleSidebar }) => {
         }
 
         .sidebar-toggle-btn:hover {
-          background: rgba(255, 255, 255, 0.1);
+          background: var(--glass-button-hover);
           border-color: var(--border-color-hover);
         }
 
@@ -143,13 +170,47 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, toggleSidebar }) => {
         }
 
         .header-stat {
-          background: rgba(22, 31, 48, 0.4);
+          background: var(--glass-bg);
           border: 1px solid var(--border-color);
           border-radius: var(--radius-md);
           padding: 0.5rem 1rem;
           display: flex;
           align-items: center;
           gap: var(--spacing-md);
+          transition: background-color var(--transition-normal), border-color var(--transition-normal);
+        }
+
+        .theme-toggle-btn {
+          background: var(--glass-button-bg);
+          border: 1px solid var(--border-color);
+          color: var(--text-primary);
+          width: 38px;
+          height: 38px;
+          border-radius: var(--radius-md);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all var(--transition-normal);
+          box-shadow: var(--card-shadow);
+        }
+
+        .theme-toggle-btn:hover {
+          background: var(--glass-button-hover);
+          border-color: var(--border-color-hover);
+          transform: translateY(-1px);
+        }
+
+        .theme-toggle-btn:active {
+          transform: translateY(0);
+        }
+
+        .theme-toggle-btn svg {
+          transition: transform var(--transition-normal);
+        }
+
+        .theme-toggle-btn:hover svg {
+          transform: rotate(15deg);
         }
 
         .stat-icon {

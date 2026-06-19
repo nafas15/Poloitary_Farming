@@ -410,8 +410,9 @@ export const Dashboard: React.FC = () => {
           justify-content: center;
           color: var(--text-muted);
           font-size: 0.9rem;
-          border: 1px dashed rgba(255, 255, 255, 0.06);
+          border: 1px dashed var(--border-color);
           border-radius: var(--radius-md);
+          transition: border-color var(--transition-normal);
         }
 
         .activity-row-container {
@@ -428,10 +429,11 @@ export const Dashboard: React.FC = () => {
           display: flex;
           align-items: center;
           padding: 0.65rem 0.85rem;
-          background: rgba(10, 14, 23, 0.3);
+          background: var(--glass-button-bg);
           border: 1px solid var(--border-color);
           border-radius: var(--radius-md);
           gap: var(--spacing-md);
+          transition: background-color var(--transition-normal), border-color var(--transition-normal);
         }
 
         .activity-icon {
@@ -492,21 +494,24 @@ export const Dashboard: React.FC = () => {
         }
 
         .alert-danger-custom {
-          background: rgba(244, 63, 94, 0.06);
+          background: var(--alert-danger-bg);
           border-color: rgba(244, 63, 94, 0.15);
-          color: #fca5a5;
+          color: var(--alert-danger-color);
+          transition: background-color var(--transition-normal), color var(--transition-normal);
         }
 
         .alert-warning-custom {
-          background: rgba(245, 158, 11, 0.06);
+          background: var(--alert-warning-bg);
           border-color: rgba(245, 158, 11, 0.15);
-          color: #fde047;
+          color: var(--alert-warning-color);
+          transition: background-color var(--transition-normal), color var(--transition-normal);
         }
 
         .alert-info-custom {
-          background: rgba(6, 182, 212, 0.06);
+          background: var(--alert-info-bg);
           border-color: rgba(6, 182, 212, 0.15);
-          color: #a5f3fc;
+          color: var(--alert-info-color);
+          transition: background-color var(--transition-normal), color var(--transition-normal);
         }
 
         @keyframes fadeIn {

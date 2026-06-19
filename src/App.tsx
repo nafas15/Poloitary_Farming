@@ -1,5 +1,6 @@
 import { useState, lazy, Suspense } from 'react';
 import { FarmProvider, useFarm } from './context/FarmContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { Login } from './pages/Login';
@@ -130,9 +131,11 @@ function App() {
   }
 
   return (
-    <FarmProvider>
-      <MainAppContent />
-    </FarmProvider>
+    <ThemeProvider>
+      <FarmProvider>
+        <MainAppContent />
+      </FarmProvider>
+    </ThemeProvider>
   );
 }
 
