@@ -1,18 +1,56 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useFarm } from '../context/FarmContext';
 import type { UserRole } from '../context/FarmContext';
 
+interface UserCredential {
+  username: string;
+  password: string;
+  role: UserRole;
+}
+
 export const Login: React.FC = () => {
   const { login } = useFarm();
+  const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login');
+  
+  // Form fields
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [role, setRole] = useState<UserRole>('Admin');
+  
+  // Notification states
   const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Initialize simulated users database in localStorage if it doesn't exist
+  useEffect(() => {
+    const defaultUsers: UserCredential[] = [
+      { username: 'admin', password: 'admin', role: 'Admin' },
+      { username: 'employee', password: 'employee', role: 'Employee' }
+    ];
+    if (!localStorage.getItem('poultry_users_list')) {
+      localStorage.setItem('poultry_users_list', JSON.stringify(defaultUsers));
+    }
+  }, []);
+
+  const getStoredUsers = (): UserCredential[] => {
+    try {
+      const stored = localStorage.getItem('poultry_users_list');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const saveStoredUsers = (users: UserCredential[]) => {
+    localStorage.setItem('poultry_users_list', JSON.stringify(users));
+  };
+
+  const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccessMsg('');
 
     if (!username || !password) {
       setError('Please fill in all fields');
@@ -23,19 +61,108 @@ export const Login: React.FC = () => {
 
     // Simulate short network delay for premium experience
     setTimeout(() => {
-      // Hardcode simple passwords: 'admin' for Admin and 'employee' for Employee
-      const expectedPassword = role === 'Admin' ? 'admin' : 'employee';
-      
-      if (password === expectedPassword) {
-        const success = login(username, role);
+      const users = getStoredUsers();
+      // Match case-insensitively for username, but matching role and password exactly
+      const matchedUser = users.find(
+        u => u.username.toLowerCase() === username.trim().toLowerCase() && u.role === role
+      );
+
+      if (matchedUser && matchedUser.password === password) {
+        const success = login(matchedUser.username, matchedUser.role);
         if (!success) {
           setError('Failed to create session. Please try again.');
         }
       } else {
-        setError('Invalid username or password.');
+        setError('Invalid username or password for selected role.');
       }
       setIsLoading(false);
     }, 800);
+  };
+
+  const handleSignupSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setSuccessMsg('');
+
+    const trimmedUser = username.trim();
+    if (!trimmedUser || !password || !confirmPassword) {
+      setError('Please fill in all fields');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    if (password.length < 4) {
+      setError('Password must be at least 4 characters');
+      return;
+    }
+
+    setIsLoading(true);
+
+    setTimeout(() => {
+      const users = getStoredUsers();
+      const userExists = users.some(
+        u => u.username.toLowerCase() === trimmedUser.toLowerCase() && u.role === role
+      );
+
+      if (userExists) {
+        setError(`A user with username "${trimmedUser}" already exists as ${role}.`);
+        setIsLoading(false);
+        return;
+      }
+
+      // Add new user
+      const updatedUsers = [...users, { username: trimmedUser, password, role }];
+      saveStoredUsers(updatedUsers);
+      
+      setSuccessMsg('Account created successfully! You can now log in.');
+      setMode('login');
+      // Autofill details to make logging in easier
+      setPassword('');
+      setConfirmPassword('');
+      setIsLoading(false);
+    }, 800);
+  };
+
+  const handleForgotSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setSuccessMsg('');
+
+    const trimmedUser = username.trim();
+    if (!trimmedUser) {
+      setError('Please enter your username');
+      return;
+    }
+
+    setIsLoading(true);
+
+    setTimeout(() => {
+      const users = getStoredUsers();
+      // Look for user matching this username
+      const matchedUser = users.find(
+        u => u.username.toLowerCase() === trimmedUser.toLowerCase()
+      );
+
+      if (matchedUser) {
+        setSuccessMsg(`Account verified! Password reset instructions simulated. (Dev mode: Password is "${matchedUser.password}")`);
+      } else {
+        setError(`No account found with username "${trimmedUser}".`);
+      }
+      setIsLoading(false);
+    }, 800);
+  };
+
+  const switchMode = (newMode: 'login' | 'signup' | 'forgot') => {
+    setError('');
+    setSuccessMsg('');
+    setUsername('');
+    setPassword('');
+    setConfirmPassword('');
+    setMode(newMode);
   };
 
   return (
@@ -52,63 +179,219 @@ export const Login: React.FC = () => {
           <p>Poultry Farm Management System</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="login-form">
-          <div className="role-selector">
-            <button
-              type="button"
-              className={`role-btn ${role === 'Admin' ? 'active admin' : ''}`}
-              onClick={() => setRole('Admin')}
-            >
-              👑 Admin
+        {error && <div className="login-error-alert">{error}</div>}
+        {successMsg && <div className="login-success-alert">{successMsg}</div>}
+
+        {mode === 'login' && (
+          <form onSubmit={handleLoginSubmit} className="login-form">
+            <h3 className="form-section-title">Sign In</h3>
+            
+            <div className="role-selector">
+              <button
+                type="button"
+                className={`role-btn ${role === 'Admin' ? 'active admin' : ''}`}
+                onClick={() => setRole('Admin')}
+                disabled={isLoading}
+              >
+                👑 Admin
+              </button>
+              <button
+                type="button"
+                className={`role-btn ${role === 'Employee' ? 'active employee' : ''}`}
+                onClick={() => setRole('Employee')}
+                disabled={isLoading}
+              >
+                🧑‍🌾 Employee
+              </button>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Username</label>
+              <input
+                type="text"
+                className="form-control"
+                placeholder={role === 'Admin' ? 'e.g. admin' : 'e.g. employee'}
+                value={username}
+                onChange={e => setUsername(e.target.value)}
+                disabled={isLoading}
+                maxLength={64}
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label className="form-label">Password</label>
+                <button
+                  type="button"
+                  className="link-btn"
+                  style={{ fontSize: '0.75rem', color: 'var(--color-indigo)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                  onClick={() => switchMode('forgot')}
+                  disabled={isLoading}
+                >
+                  Forgot Password?
+                </button>
+              </div>
+              <input
+                type="password"
+                className="form-control"
+                placeholder="••••••••"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                disabled={isLoading}
+                maxLength={64}
+                required
+              />
+            </div>
+
+            <button type="submit" className="btn btn-primary login-submit-btn" disabled={isLoading}>
+              {isLoading ? (
+                <span className="spinner-loader"></span>
+              ) : (
+                'Access Dashboard'
+              )}
             </button>
-            <button
-              type="button"
-              className={`role-btn ${role === 'Employee' ? 'active employee' : ''}`}
-              onClick={() => setRole('Employee')}
-            >
-              🧑‍🌾 Employee
+
+            <div className="auth-footer-links">
+              <span>Don't have an account? </span>
+              <button
+                type="button"
+                className="text-link"
+                onClick={() => switchMode('signup')}
+                disabled={isLoading}
+              >
+                Sign Up
+              </button>
+            </div>
+          </form>
+        )}
+
+        {mode === 'signup' && (
+          <form onSubmit={handleSignupSubmit} className="login-form">
+            <h3 className="form-section-title">Create Account</h3>
+
+            <div className="role-selector">
+              <button
+                type="button"
+                className={`role-btn ${role === 'Admin' ? 'active admin' : ''}`}
+                onClick={() => setRole('Admin')}
+                disabled={isLoading}
+              >
+                👑 Register Admin
+              </button>
+              <button
+                type="button"
+                className={`role-btn ${role === 'Employee' ? 'active employee' : ''}`}
+                onClick={() => setRole('Employee')}
+                disabled={isLoading}
+              >
+                🧑‍🌾 Register Employee
+              </button>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Username</label>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="Enter username"
+                value={username}
+                onChange={e => setUsername(e.target.value)}
+                disabled={isLoading}
+                maxLength={64}
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Password</label>
+              <input
+                type="password"
+                className="form-control"
+                placeholder="Min 4 characters"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                disabled={isLoading}
+                maxLength={64}
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Confirm Password</label>
+              <input
+                type="password"
+                className="form-control"
+                placeholder="Re-enter password"
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+                disabled={isLoading}
+                maxLength={64}
+                required
+              />
+            </div>
+
+            <button type="submit" className="btn btn-primary login-submit-btn" disabled={isLoading}>
+              {isLoading ? (
+                <span className="spinner-loader"></span>
+              ) : (
+                'Register Account'
+              )}
             </button>
-          </div>
 
-          {error && <div className="login-error-alert">{error}</div>}
+            <div className="auth-footer-links">
+              <span>Already have an account? </span>
+              <button
+                type="button"
+                className="text-link"
+                onClick={() => switchMode('login')}
+                disabled={isLoading}
+              >
+                Sign In
+              </button>
+            </div>
+          </form>
+        )}
 
-          <div className="form-group">
-            <label className="form-label">Username</label>
-            <input
-              type="text"
-              className="form-control"
-              placeholder={role === 'Admin' ? 'e.g. admin' : 'e.g. employee'}
-              value={username}
-              onChange={e => setUsername(e.target.value)}
-              disabled={isLoading}
-              maxLength={64}
-              required
-            />
-          </div>
+        {mode === 'forgot' && (
+          <form onSubmit={handleForgotSubmit} className="login-form">
+            <h3 className="form-section-title">Reset Password</h3>
+            <p className="form-section-desc">Enter your username and we will verify the account details.</p>
 
-          <div className="form-group">
-            <label className="form-label">Password</label>
-            <input
-              type="password"
-              className="form-control"
-              placeholder="••••••••"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              disabled={isLoading}
-              maxLength={64}
-              required
-            />
-          </div>
+            <div className="form-group">
+              <label className="form-label">Username</label>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="Enter registered username"
+                value={username}
+                onChange={e => setUsername(e.target.value)}
+                disabled={isLoading}
+                maxLength={64}
+                required
+              />
+            </div>
 
-          <button type="submit" className="btn btn-primary login-submit-btn" disabled={isLoading}>
-            {isLoading ? (
-              <span className="spinner-loader"></span>
-            ) : (
-              'Access Dashboard'
-            )}
-          </button>
-        </form>
+            <button type="submit" className="btn btn-primary login-submit-btn" disabled={isLoading}>
+              {isLoading ? (
+                <span className="spinner-loader"></span>
+              ) : (
+                'Verify Account'
+              )}
+            </button>
 
+            <div className="auth-footer-links">
+              <button
+                type="button"
+                className="text-link"
+                onClick={() => switchMode('login')}
+                disabled={isLoading}
+              >
+                ← Back to Sign In
+              </button>
+            </div>
+          </form>
+        )}
       </div>
 
       <style>{`
@@ -163,6 +446,10 @@ export const Login: React.FC = () => {
           padding: var(--spacing-xl) !important;
           z-index: 10;
           border-radius: var(--radius-xl) !important;
+          background: var(--bg-card);
+          box-shadow: var(--card-shadow);
+          border: 1px solid var(--border-color);
+          transition: background-color var(--transition-normal), border-color var(--transition-normal);
         }
 
         .login-header {
@@ -188,11 +475,27 @@ export const Login: React.FC = () => {
           margin-top: var(--spacing-xs);
         }
 
+        .form-section-title {
+          font-size: 1.2rem;
+          font-weight: 650;
+          color: var(--text-primary);
+          margin-bottom: var(--spacing-md);
+          text-align: center;
+        }
+
+        .form-section-desc {
+          font-size: 0.82rem;
+          color: var(--text-secondary);
+          margin-bottom: var(--spacing-md);
+          text-align: center;
+          line-height: 1.4;
+        }
+
         .role-selector {
           display: flex;
           gap: var(--spacing-md);
           margin-bottom: var(--spacing-lg);
-          background: rgba(10, 14, 23, 0.6);
+          background: var(--glass-button-bg);
           padding: var(--spacing-xs);
           border-radius: var(--radius-md);
           border: 1px solid var(--border-color);
@@ -242,6 +545,18 @@ export const Login: React.FC = () => {
           animation: slideUp 0.2s ease-out;
         }
 
+        .login-success-alert {
+          background: var(--color-emerald-glow);
+          color: var(--color-emerald);
+          border: 1px solid rgba(16, 185, 129, 0.2);
+          padding: 0.75rem;
+          border-radius: var(--radius-md);
+          font-size: 0.82rem;
+          font-weight: 500;
+          margin-bottom: var(--spacing-lg);
+          animation: slideUp 0.2s ease-out;
+        }
+
         .login-submit-btn {
           width: 100%;
           padding: 0.8rem;
@@ -249,21 +564,30 @@ export const Login: React.FC = () => {
           margin-top: var(--spacing-sm);
         }
 
-        .login-hint {
+        .auth-footer-links {
           display: flex;
-          align-items: flex-start;
-          gap: 0.5rem;
-          margin-top: var(--spacing-lg);
-          font-size: 0.75rem;
-          color: var(--text-muted);
-          line-height: 1.4;
-          text-align: center;
           justify-content: center;
+          gap: 0.25rem;
+          font-size: 0.82rem;
+          color: var(--text-secondary);
+          margin-top: var(--spacing-lg);
         }
 
-        .login-hint svg {
-          margin-top: 2px;
-          flex-shrink: 0;
+        .text-link {
+          background: none;
+          border: none;
+          color: var(--color-emerald);
+          font-weight: 600;
+          cursor: pointer;
+          padding: 0;
+          font-family: var(--font-family);
+          font-size: 0.82rem;
+          transition: color var(--transition-fast);
+        }
+
+        .text-link:hover {
+          color: var(--color-cyan);
+          text-decoration: underline;
         }
 
         /* Spinner Loader */
@@ -295,4 +619,3 @@ export const Login: React.FC = () => {
     </div>
   );
 };
-

@@ -380,14 +380,8 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!trimmed || trimmed.length > 64) return false;
     if (role !== 'Admin' && role !== 'Employee') return false;
 
-    if (
-      (role === 'Admin' && trimmed.toLowerCase() === 'admin') ||
-      (role === 'Employee' && trimmed.toLowerCase() === 'employee')
-    ) {
-      setCurrentUser({ username: trimmed, role });
-      return true;
-    }
-    return false;
+    setCurrentUser({ username: trimmed, role });
+    return true;
   };
 
   const logout = () => {
