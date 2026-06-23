@@ -80,6 +80,10 @@ export const BirdMgmt: React.FC = () => {
   const [sellPricePerKg, setSellPricePerKg] = useState<number>(0);
   const [sellCustomer, setSellCustomer] = useState('');
   const [sellContact, setSellContact] = useState('');
+  const [sellAmountPaid, setSellAmountPaid] = useState<number>(0);
+  const [isSellAmountPaidCustom, setIsSellAmountPaidCustom] = useState<boolean>(false);
+  const [sellTransport, setSellTransport] = useState<number>(0);
+  const [sellOther, setSellOther] = useState<number>(0);
 
   // Form Fields - Log Mortality
   const [mortalityQty, setMortalityQty] = useState<number>(1);
@@ -137,45 +141,60 @@ export const BirdMgmt: React.FC = () => {
     setIsMortalityModalOpen(false);
   };
 
-  const handleSellSubmit = (e: React.FormEvent) => {
+  const handleSellSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!sellBatchId || !sellCustomer.trim() || sellQty <= 0) return;
     const batch = batches.find(b => b.id === sellBatchId);
-    if (!batch || batch.currentQuantity < sellQty) {
+    if (batch && batch.currentQuantity < sellQty) {
       alert(`Insufficient birds. Only ${batch?.currentQuantity ?? 0} remaining in Batch ${sellBatchId}.`);
       return;
     }
 
-    const isBroiler = batch.type === 'Broiler';
-    const computedUnitPrice = isBroiler && sellWeightKg && sellPricePerKg
-      ? (sellWeightKg * sellPricePerKg) / sellQty
-      : sellUnitPrice;
-
-    const computedTotal = isBroiler && sellWeightKg && sellPricePerKg
-      ? sellWeightKg * sellPricePerKg
-      : sellQty * sellUnitPrice;
+    const isBroiler = batch?.type === 'Broiler';
+    const subtotal = isBroiler 
+      ? Number(sellWeightKg) * Number(sellPricePerKg)
+      : Number(sellQty) * Number(sellUnitPrice);
+      
+    const computedTotal = subtotal + sellTransport + sellOther;
+    const finalPaid = isSellAmountPaidCustom ? sellAmountPaid : computedTotal;
 
     sellBatch(
       sellBatchId, 
       sellQty, 
-      computedUnitPrice, 
+      isBroiler ? subtotal / sellQty : sellUnitPrice, 
       sellCustomer, 
       sellContact,
       isBroiler ? sellWeightKg : undefined,
       isBroiler ? sellPricePerKg : undefined,
-      computedTotal
+      subtotal,
+      finalPaid,
+      sellTransport,
+      sellOther,
+      customerOldBalance
     );
 
     // Reset and Close
+    setIsSellModalOpen(false);
     setSellBatchId('');
-    setSellQty(100);
+    setSellQty(0);
     setSellUnitPrice(0);
     setSellWeightKg(0);
     setSellPricePerKg(0);
     setSellCustomer('');
     setSellContact('');
-    setIsSellModalOpen(false);
+    setSellAmountPaid(0);
+    setIsSellAmountPaidCustom(false);
+    setSellTransport(0);
+    setSellOther(0);
   };
+
+  // Dynamically compute the customer's outstanding balance
+  const customerOldBalance = React.useMemo(() => {
+    if (!sellCustomer.trim()) return 0;
+    return sales
+      .filter(s => s.customerName.trim().toLowerCase() === sellCustomer.trim().toLowerCase())
+      .reduce((sum, s) => sum + (s.totalAmount - (s.amountPaid ?? 0)), 0);
+  }, [sales, sellCustomer]);
 
   const activeBatches = batches.filter(b => b.status === 'Active' && b.currentQuantity > 0);
   const selectedSellBatch = activeBatches.find(b => b.id === sellBatchId);
@@ -213,6 +232,8 @@ export const BirdMgmt: React.FC = () => {
               setSellPricePerKg(0);
               setSellCustomer('');
               setSellContact('');
+              setSellTransport(0);
+              setSellOther(0);
               setIsSellModalOpen(true);
             }}
           >
@@ -293,6 +314,8 @@ export const BirdMgmt: React.FC = () => {
                                 setSellPricePerKg(0);
                                 setSellCustomer('');
                                 setSellContact('');
+                                setSellTransport(0);
+                                setSellOther(0);
                                 setIsSellModalOpen(true);
                               }}
                             >
@@ -375,6 +398,8 @@ export const BirdMgmt: React.FC = () => {
                                 setSellPricePerKg(0);
                                 setSellCustomer('');
                                 setSellContact('');
+                                setSellTransport(0);
+                                setSellOther(0);
                                 setIsSellModalOpen(true);
                               }}
                             >
@@ -751,10 +776,21 @@ export const BirdMgmt: React.FC = () => {
                 className="form-control"
                 placeholder="e.g. Fresh Meats Co."
                 value={sellCustomer}
-                onChange={e => setSellCustomer(e.target.value)}
+                onChange={e => {
+                  setSellCustomer(e.target.value);
+                  const existing = sales.find(s => s.customerName.trim().toLowerCase() === e.target.value.trim().toLowerCase());
+                  if (existing) {
+                    setSellContact(existing.customerContact);
+                  }
+                }}
                 maxLength={128}
                 required
               />
+              {customerOldBalance > 0 && (
+                <span style={{ fontSize: '0.78rem', color: 'var(--color-rose)', fontWeight: 'bold', marginTop: '0.2rem', display: 'block' }}>
+                  ⚠️ Outstanding Balance: Rs {customerOldBalance.toFixed(2)}
+                </span>
+              )}
             </div>
             <div className="form-group">
               <label className="form-label">Customer Contact</label>
@@ -770,45 +806,142 @@ export const BirdMgmt: React.FC = () => {
             </div>
           </div>
 
-          {sellQty > 0 && (selectedSellBatch?.type === 'Broiler' ? (sellWeightKg > 0 && sellPricePerKg > 0) : (sellUnitPrice > 0)) && (
-            <div className="sell-summary-preview">
-              <div className="sell-summary-row">
-                <span>Quantity</span>
-                <strong>{sellQty.toLocaleString()} birds</strong>
-              </div>
-              {selectedSellBatch?.type === 'Broiler' ? (
-                <>
-                  <div className="sell-summary-row">
-                    <span>Total Weight</span>
-                    <strong>{sellWeightKg.toLocaleString()} kg</strong>
+          {(() => {
+            const subtotal = selectedSellBatch?.type === 'Broiler'
+              ? (sellWeightKg * sellPricePerKg || 0)
+              : (sellQty * sellUnitPrice || 0);
+            const currentInvoiceTotal = subtotal + sellTransport + sellOther;
+            const displayAmountPaid = isSellAmountPaidCustom ? sellAmountPaid : currentInvoiceTotal;
+            return (
+              <>
+                {sellQty > 0 && (selectedSellBatch?.type === 'Broiler' ? (sellWeightKg > 0 && sellPricePerKg > 0) : (sellUnitPrice > 0)) && (
+                  <>
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label className="form-label">Transport Charges (Rs)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          className="form-control"
+                          value={sellTransport || ''}
+                          onChange={e => setSellTransport(Number(e.target.value))}
+                          placeholder="0.00"
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Other Charges (Rs)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          className="form-control"
+                          value={sellOther || ''}
+                          onChange={e => setSellOther(Number(e.target.value))}
+                          placeholder="0.00"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="form-row" style={{ marginTop: '0.5rem', marginBottom: '0.5rem' }}>
+                      <div className="form-group">
+                        <label className="form-label">Amount Paid now (Rs)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          className="form-control"
+                          value={isSellAmountPaidCustom ? sellAmountPaid : currentInvoiceTotal || ''}
+                          onChange={e => {
+                            setIsSellAmountPaidCustom(true);
+                            setSellAmountPaid(Number(e.target.value));
+                          }}
+                          placeholder="Defaults to full invoice total"
+                          required
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-xs-custom"
+                          style={{ marginTop: '0.2rem', padding: '0.2rem 0.4rem', fontSize: '0.7rem', width: 'fit-content' }}
+                          onClick={() => {
+                            setIsSellAmountPaidCustom(false);
+                            setSellAmountPaid(currentInvoiceTotal);
+                          }}
+                        >
+                          Reset to Full Amount (Rs {currentInvoiceTotal.toFixed(2)})
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+                
+                {sellQty > 0 && (selectedSellBatch?.type === 'Broiler' ? (sellWeightKg > 0 && sellPricePerKg > 0) : (sellUnitPrice > 0)) && (
+                  <div className="sell-summary-preview">
+                    <div className="sell-summary-row">
+                      <span>Quantity</span>
+                      <strong>{sellQty.toLocaleString()} birds</strong>
+                    </div>
+                    {selectedSellBatch?.type === 'Broiler' && (
+                      <>
+                        <div className="sell-summary-row">
+                          <span>Total Weight</span>
+                          <strong>{sellWeightKg.toLocaleString()} kg</strong>
+                        </div>
+                        <div className="sell-summary-row">
+                          <span>Price per Kg</span>
+                          <strong>Rs {sellPricePerKg.toFixed(2)}/kg</strong>
+                        </div>
+                        <div className="sell-summary-row" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                          <span>Implied Unit Price</span>
+                          <span>Rs {((sellWeightKg * sellPricePerKg) / sellQty).toFixed(2)}/bird</span>
+                        </div>
+                      </>
+                    )}
+                    <div className="sell-summary-row" style={{ borderTop: '1px dashed rgba(16,185,129,0.15)', paddingTop: '0.25rem' }}>
+                      <span>Subtotal</span>
+                      <strong>Rs {subtotal.toFixed(2)}</strong>
+                    </div>
+                    {sellTransport > 0 && (
+                      <div className="sell-summary-row">
+                        <span>Transport Charges</span>
+                        <strong>+ Rs {sellTransport.toFixed(2)}</strong>
+                      </div>
+                    )}
+                    {sellOther > 0 && (
+                      <div className="sell-summary-row">
+                        <span>Other Charges</span>
+                        <strong>+ Rs {sellOther.toFixed(2)}</strong>
+                      </div>
+                    )}
+                    <div className="sell-summary-row" style={{ borderTop: '1px dashed rgba(16,185,129,0.15)' }}>
+                      <span>Current Invoice Billed</span>
+                      <strong>Rs {currentInvoiceTotal.toFixed(2)}</strong>
+                    </div>
+                    <div className="sell-summary-row">
+                      <span>Customer Old Balance</span>
+                      <span className={customerOldBalance > 0 ? "color-rose" : ""}>Rs {customerOldBalance.toFixed(2)}</span>
+                    </div>
+                    <div className="sell-summary-row" style={{ borderTop: '1px dashed rgba(16,185,129,0.2)', paddingTop: '0.3rem', marginTop: '0.1rem', fontWeight: 600 }}>
+                      <span>Total Net Outstanding</span>
+                      <strong>Rs {(currentInvoiceTotal + customerOldBalance).toFixed(2)}</strong>
+                    </div>
+                    <div className="sell-summary-row" style={{ color: 'var(--color-emerald)' }}>
+                      <span>Amount Paid now</span>
+                      <strong>Rs {displayAmountPaid.toFixed(2)}</strong>
+                    </div>
+                    {((currentInvoiceTotal + customerOldBalance) - displayAmountPaid) !== 0 && (
+                      <div className="sell-summary-row sell-summary-total" style={{ borderTop: '1px solid rgba(16,185,129,0.3)' }}>
+                        <span>{((currentInvoiceTotal + customerOldBalance) - displayAmountPaid) > 0 ? 'Final Net Due' : 'Change/Overpaid'}</span>
+                        <strong className={((currentInvoiceTotal + customerOldBalance) - displayAmountPaid) > 0 ? "color-rose" : "color-emerald"}>
+                          Rs {Math.abs((currentInvoiceTotal + customerOldBalance) - displayAmountPaid).toFixed(2)}
+                        </strong>
+                      </div>
+                    )}
                   </div>
-                  <div className="sell-summary-row">
-                    <span>Price per Kg</span>
-                    <strong>Rs {sellPricePerKg.toFixed(2)}/kg</strong>
-                  </div>
-                  <div className="sell-summary-row" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    <span>Implied Unit Price</span>
-                    <span>Rs {((sellWeightKg * sellPricePerKg) / sellQty).toFixed(2)}/bird</span>
-                  </div>
-                  <div className="sell-summary-row sell-summary-total">
-                    <span>Invoice Total</span>
-                    <strong>Rs {(sellWeightKg * sellPricePerKg).toFixed(2)}</strong>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="sell-summary-row">
-                    <span>Unit Price</span>
-                    <strong>Rs {sellUnitPrice.toFixed(2)}/bird</strong>
-                  </div>
-                  <div className="sell-summary-row sell-summary-total">
-                    <span>Invoice Total</span>
-                    <strong>Rs {(sellQty * sellUnitPrice).toFixed(2)}</strong>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
+                )}
+              </>
+            );
+          })()}
         </form>
       </Modal>
 

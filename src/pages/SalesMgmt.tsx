@@ -12,20 +12,62 @@ const savePaidIds = (ids: Set<string>) => {
   localStorage.setItem(PAID_KEY, JSON.stringify([...ids]));
 };
 
+const getSaleTimestamp = (s: Sale): number => {
+  if (s.updatedAt) {
+    if (s.updatedAt.includes('T')) {
+      const parsed = Date.parse(s.updatedAt);
+      if (!isNaN(parsed)) return parsed;
+    }
+    if (s.updatedAt.startsWith('s-')) {
+      const ms = Number(s.updatedAt.slice(2));
+      if (!isNaN(ms)) return ms;
+    }
+    const num = Number(s.updatedAt);
+    if (!isNaN(num)) return num;
+  }
+  
+  if (s.id.startsWith('s-')) {
+    const ms = Number(s.id.slice(2));
+    if (!isNaN(ms)) return ms;
+  }
+  
+  const numId = Number(s.id);
+  if (!isNaN(numId)) return numId;
+  
+  if (s.date) {
+    const parsedDate = Date.parse(s.date);
+    if (!isNaN(parsedDate)) return parsedDate;
+  }
+
+  return 0;
+};
+
 export const SalesMgmt: React.FC = () => {
-  const { batches, sales, deleteSale, updateSale } = useFarm();
+  const { batches, sales, deleteSale, updateSale, addEggSale } = useFarm();
 
   // Paid status (local, persisted to localStorage)
   const [paidIds, setPaidIds] = useState<Set<string>>(loadPaidIds);
-  const togglePaid = (saleId: string) => {
+  const togglePaid = async (saleId: string) => {
+    const sale = sales.find(s => s.id === saleId);
+    if (!sale) return;
+    const isPaid = paidIds.has(saleId);
+    const newAmountPaid = isPaid ? 0 : sale.totalAmount;
+
     setPaidIds(prev => {
       const next = new Set(prev);
       if (next.has(saleId)) next.delete(saleId); else next.add(saleId);
       savePaidIds(next);
       return next;
     });
+
+    await updateSale(saleId, {
+      ...sale,
+      amountPaid: newAmountPaid
+    });
   };
 
+  const [activeTab, setActiveTab] = useState<'ledger' | 'balances'>('ledger');
+  const [customerSearch, setCustomerSearch] = useState('');
   const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
   const [activeInvoice, setActiveInvoice] = useState<Sale | null>(null);
   const [amountPaid, setAmountPaid] = useState<number>(0);
@@ -47,6 +89,20 @@ export const SalesMgmt: React.FC = () => {
   const [editSalePricePerKg, setEditSalePricePerKg] = useState<number>(0);
   const [editSaleBatchId, setEditSaleBatchId] = useState('');
   const [editSaleDetails, setEditSaleDetails] = useState('');
+  const [editSaleAmountPaid, setEditSaleAmountPaid] = useState<number>(0);
+  const [editSaleTransport, setEditSaleTransport] = useState<number>(0);
+  const [editSaleOther, setEditSaleOther] = useState<number>(0);
+  const [editSaleOldBalance, setEditSaleOldBalance] = useState<number>(0);
+
+  // Direct Customer Payment States
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [paymentCustomer, setPaymentCustomer] = useState('');
+  const [isNewCustomer, setIsNewCustomer] = useState(false);
+  const [newCustomerName, setNewCustomerName] = useState('');
+  const [paymentContact, setPaymentContact] = useState('');
+  const [paymentAmount, setPaymentAmount] = useState<number>(0);
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
+  const [paymentDetails, setPaymentDetails] = useState('Cash Payment');
 
   const handleOpenEditSale = (s: Sale) => {
     setEditingSaleId(s.id);
@@ -60,6 +116,10 @@ export const SalesMgmt: React.FC = () => {
     setEditSalePricePerKg(s.pricePerKg || 0);
     setEditSaleBatchId(s.batchId || '');
     setEditSaleDetails(s.details || '');
+    setEditSaleAmountPaid(s.amountPaid || 0);
+    setEditSaleTransport(s.transportCharges || 0);
+    setEditSaleOther(s.otherCharges || 0);
+    setEditSaleOldBalance(s.oldBalance || 0);
     setIsEditSaleModalOpen(true);
   };
 
@@ -68,7 +128,7 @@ export const SalesMgmt: React.FC = () => {
     if (!editingSaleId) return;
 
     const isBroilerSale = editSaleType === 'Bird' && editSaleWeightKg > 0;
-    const finalTotalAmount = isBroilerSale
+    const finalSubtotal = isBroilerSale
       ? Number(editSaleWeightKg) * Number(editSalePricePerKg)
       : Number(editSaleQty) * Number(editSaleUnitPrice);
 
@@ -78,8 +138,12 @@ export const SalesMgmt: React.FC = () => {
       customerName: editSaleCustomerName,
       customerContact: editSaleCustomerContact,
       quantity: Number(editSaleQty),
-      unitPrice: isBroilerSale ? finalTotalAmount / Number(editSaleQty) : Number(editSaleUnitPrice),
-      totalAmount: finalTotalAmount,
+      unitPrice: isBroilerSale ? finalSubtotal / Number(editSaleQty) : Number(editSaleUnitPrice),
+      totalAmount: finalSubtotal,
+      amountPaid: Number(editSaleAmountPaid),
+      transportCharges: Number(editSaleTransport),
+      otherCharges: Number(editSaleOther),
+      oldBalance: Number(editSaleOldBalance),
       batchId: editSaleType === 'Bird' ? editSaleBatchId : undefined,
       details: editSaleDetails,
       weightKg: isBroilerSale ? Number(editSaleWeightKg) : undefined,
@@ -90,11 +154,33 @@ export const SalesMgmt: React.FC = () => {
 
   const handleViewInvoice = (sale: Sale) => {
     setActiveInvoice(sale);
-    setAmountPaid(sale.totalAmount);
+    setAmountPaid(sale.amountPaid ?? sale.totalAmount);
     setExtraCharges([]);
     setNewChargeLabel('Transport');
     setNewChargeAmount(0);
     setIsInvoiceOpen(true);
+  };
+
+  const handleSavePayment = async () => {
+    if (!activeInvoice) return;
+    const subtotal = activeInvoice.totalAmount - (activeInvoice.transportCharges || 0) - (activeInvoice.otherCharges || 0);
+    await updateSale(activeInvoice.id, {
+      type: activeInvoice.type,
+      date: activeInvoice.date,
+      customerName: activeInvoice.customerName,
+      customerContact: activeInvoice.customerContact,
+      quantity: activeInvoice.quantity,
+      unitPrice: activeInvoice.unitPrice,
+      totalAmount: subtotal,
+      amountPaid: amountPaid,
+      transportCharges: activeInvoice.transportCharges,
+      otherCharges: activeInvoice.otherCharges,
+      oldBalance: activeInvoice.oldBalance,
+      batchId: activeInvoice.batchId,
+      details: activeInvoice.details,
+      weightKg: activeInvoice.weightKg,
+      pricePerKg: activeInvoice.pricePerKg
+    });
   };
 
   const handlePrint = () => {
@@ -113,6 +199,12 @@ export const SalesMgmt: React.FC = () => {
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <style>
+    :root {
+      --border-color: #d1d5db;
+      --text-muted: #6b7280;
+      --color-rose: #dc2626;
+      --color-emerald: #059669;
+    }
     @page { size: A4; margin: 1.5cm; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -173,14 +265,14 @@ export const SalesMgmt: React.FC = () => {
     .charge-pos-val { color: #0284c7; font-weight: 600; }
     .charge-neg-val { color: #dc2626; font-weight: 600; }
     .extra-charge-right { display: flex; align-items: center; gap: 0.35rem; }
-    .remove-charge-btn, .add-charge-row, .charge-sign-toggle { display: none !important; }
+    .remove-charge-btn, .add-charge-row, .charge-sign-toggle, .print-exclude { display: none !important; }
     .payment-given-row {
       color: #d97706; font-weight: 600;
       border-top: 1px dashed #fcd34d; padding-top: 0.4rem; margin-top: 0.1rem;
     }
     .balance-row { font-size: 1rem; font-weight: 700; border-top: 1px solid #d1d5db; padding-top: 0.5rem; margin-top: 0.15rem; }
     .change-positive { color: #059669; }
-    .balance-due { color: #111827; }
+    .balance-due { color: #dc2626; }
     .invoice-footer-notes {
       text-align: center; font-size: 0.78rem; color: #9ca3af;
       border-top: 1px solid #e5e7eb; padding-top: 1rem;
@@ -205,10 +297,12 @@ export const SalesMgmt: React.FC = () => {
   const birdSales = sales.filter(s => s.type === 'Bird');
   const eggSales = sales.filter(s => s.type === 'Egg');
 
-  // Filtered sales for the ledger
+  // Filtered sales for the ledger (exclude payments from Bird/Egg profit ledgers)
   const filteredSales = sales.filter(s => {
     if (ledgerFilter === 'All') return true;
-    return s.type === ledgerFilter;
+    if (ledgerFilter === 'Bird') return s.type === 'Bird' && s.totalAmount > 0;
+    if (ledgerFilter === 'Egg') return s.type === 'Egg' && s.totalAmount > 0;
+    return true;
   });
 
   const filteredRevenue = filteredSales.reduce((sum, s) => sum + s.totalAmount, 0);
@@ -220,8 +314,169 @@ export const SalesMgmt: React.FC = () => {
   }, 0);
   const filteredProfit = filteredRevenue - filteredCost;
 
+  const handlePaymentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const finalCustomer = isNewCustomer ? newCustomerName.trim() : paymentCustomer.trim();
+    if (!finalCustomer || paymentAmount <= 0) return;
+
+    await addEggSale({
+      date: paymentDate,
+      customerName: finalCustomer,
+      customerContact: paymentContact,
+      quantity: 0,
+      unitPrice: 0,
+      totalAmount: 0,
+      amountPaid: paymentAmount,
+      details: paymentDetails ? `Payment: ${paymentDetails}` : 'Customer Payment Received',
+      transportCharges: 0,
+      otherCharges: 0,
+      oldBalance: 0
+    });
+
+    setIsPaymentModalOpen(false);
+    setPaymentCustomer('');
+    setIsNewCustomer(false);
+    setNewCustomerName('');
+    setPaymentContact('');
+    setPaymentAmount(0);
+    setPaymentDetails('Cash Payment');
+  };
+
+  const uniqueCustomerNames = React.useMemo(() => {
+    const names = new Set<string>();
+    sales.forEach(s => {
+      if (s.customerName && s.customerName.trim()) {
+        names.add(s.customerName.trim());
+      }
+    });
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }, [sales]);
+
+  // Compute prior running balances for each invoice chronologically
+  const salePriorBalances = React.useMemo(() => {
+    const balancesMap: { [saleId: string]: number } = {};
+    
+    // Group sales by customer (case-insensitive, trimmed)
+    const salesByCustomer: { [customerKey: string]: Sale[] } = {};
+    sales.forEach(s => {
+      if (!s.customerName) return;
+      const key = s.customerName.trim().toLowerCase();
+      if (!salesByCustomer[key]) {
+        salesByCustomer[key] = [];
+      }
+      salesByCustomer[key].push(s);
+    });
+    
+    // For each customer, sort chronologically and compute running balance
+    Object.keys(salesByCustomer).forEach(key => {
+      const customerSales = salesByCustomer[key];
+      // Sort ascending: date first, then id
+      customerSales.sort((a, b) => {
+        const dateComp = a.date.localeCompare(b.date);
+        if (dateComp !== 0) return dateComp;
+        return a.id.localeCompare(b.id);
+      });
+      
+      let runningBalance = 0;
+      customerSales.forEach(s => {
+        balancesMap[s.id] = runningBalance;
+        runningBalance += s.totalAmount - (s.amountPaid ?? 0);
+      });
+    });
+    
+    return balancesMap;
+  }, [sales]);
+
+  // Group sales by customer name to get outstanding balance directory
+  const customerBalances = React.useMemo(() => {
+    const map: { [key: string]: { name: string; contact: string; billed: number; paid: number } } = {};
+    sales.forEach(s => {
+      const key = s.customerName.trim().toLowerCase();
+      if (!map[key]) {
+        map[key] = {
+          name: s.customerName.trim(),
+          contact: s.customerContact || 'N/A',
+          billed: 0,
+          paid: 0
+        };
+      }
+      map[key].billed += s.totalAmount;
+      map[key].paid += s.amountPaid ?? 0;
+      if (s.customerContact && s.customerContact !== 'N/A' && map[key].contact === 'N/A') {
+        map[key].contact = s.customerContact;
+      }
+    });
+    return Object.values(map);
+  }, [sales]);
+
+  const filteredCustomerBalances = customerBalances.filter(c => 
+    c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
+    c.contact.toLowerCase().includes(customerSearch.toLowerCase())
+  );
+
+  // Find Old Balance for current active invoice (calculated prior to invoice date)
+  const activeCustomerName = activeInvoice?.customerName || '';
+  const activeInvoiceDate = activeInvoice?.date || '';
+  const activeInvoiceId = activeInvoice?.id || '';
+
+  const oldBalance = React.useMemo(() => {
+    if (!activeInvoice) return 0;
+    // Check if there is an oldBalance saved at time of creation, else compute dynamically
+    if (activeInvoice.oldBalance !== undefined && activeInvoice.oldBalance > 0) {
+      return activeInvoice.oldBalance;
+    }
+    return sales
+      .filter(s => 
+        s.customerName.trim().toLowerCase() === activeCustomerName.trim().toLowerCase() &&
+        s.id !== activeInvoiceId &&
+        s.date < activeInvoiceDate
+      )
+      .reduce((sum, s) => sum + (s.totalAmount - (s.amountPaid ?? 0)), 0);
+  }, [sales, activeInvoice, activeCustomerName, activeInvoiceDate, activeInvoiceId]);
+
   return (
     <div className="sales-mgmt-page animate-fade-in">
+
+      <div className="page-header-actions">
+        <div>
+          <h2 style={{ fontSize: '1.6rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>Sales & Invoice Registry</h2>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>Track transactions, invoice payments, and customer ledger balances</p>
+        </div>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div className="filter-tabs">
+            <button 
+              type="button" 
+              className={`tab-btn ${activeTab === 'ledger' ? 'active' : ''}`}
+              onClick={() => setActiveTab('ledger')}
+            >
+              🧾 Transactions Ledger
+            </button>
+            <button 
+              type="button" 
+              className={`tab-btn ${activeTab === 'balances' ? 'active' : ''}`}
+              onClick={() => setActiveTab('balances')}
+            >
+              👥 Customer Balances Directory
+            </button>
+          </div>
+          <button 
+            type="button" 
+            className="btn btn-primary"
+            onClick={() => {
+              setIsNewCustomer(false);
+              setPaymentCustomer('');
+              setNewCustomerName('');
+              setPaymentContact('');
+              setPaymentAmount(0);
+              setPaymentDetails('Cash Payment');
+              setIsPaymentModalOpen(true);
+            }}
+            style={{ padding: '0.5rem 1rem', fontSize: '0.85rem', fontWeight: 600 }}
+          >
+            💳 Receive Payment
+          </button>
+        </div>
+      </div>
 
       {/* ── Summary Stats ── */}
       <div className="sales-stats-row">
@@ -255,171 +510,286 @@ export const SalesMgmt: React.FC = () => {
         </div>
       </div>
 
-      <div className="glass-card">
-        <div className="sm-card-header">
-          <div>
-            <h3>Sales Transactions Ledger</h3>
-            <p className="chart-subtitle">{sales.length} invoices · Rs {totalRevenue.toFixed(2)} total revenue</p>
-          </div>
-          <div className="ledger-filter-controls">
-            <button 
-              type="button"
-              className={`ledger-filter-btn ${ledgerFilter === 'All' ? 'active' : ''}`} 
-              onClick={() => setLedgerFilter('All')}
-            >
-              All
-            </button>
-            <button 
-              type="button"
-              className={`ledger-filter-btn ${ledgerFilter === 'Bird' ? 'active' : ''}`} 
-              onClick={() => setLedgerFilter('Bird')}
-            >
-              🐔 Bird Profit
-            </button>
-            <button 
-              type="button"
-              className={`ledger-filter-btn ${ledgerFilter === 'Egg' ? 'active' : ''}`} 
-              onClick={() => setLedgerFilter('Egg')}
-            >
-              🥚 Egg Profit
-            </button>
-          </div>
-        </div>
-
-        {sales.length === 0 ? (
-          <div className="sm-empty-state">
-            <div className="sm-empty-icon">🧾</div>
-            <p>No sales transactions recorded yet.</p>
-          </div>
-        ) : (
-          <>
-            {/* Mini-stats summary bar */}
-            <div className="ledger-summary-bar">
-              <div className="ledger-summary-card">
-                <span className="ledger-summary-label">Revenue (Selected)</span>
-                <span className="ledger-summary-value color-emerald">
-                  Rs {filteredRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-              </div>
-              <div className="ledger-summary-card">
-                <span className="ledger-summary-label">Initial Cost</span>
-                <span className="ledger-summary-value color-rose">
-                  Rs {filteredCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-              </div>
-              <div className="ledger-summary-card">
-                <span className="ledger-summary-label">Net Profit</span>
-                <span className={`ledger-summary-value ${filteredProfit >= 0 ? 'color-emerald' : 'color-rose'}`}>
-                  Rs {filteredProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-              </div>
+      {activeTab === 'balances' ? (
+        <div className="glass-card animate-fade-in">
+          <div className="sm-card-header">
+            <div>
+              <h3>Customer Balances Directory</h3>
+              <p className="chart-subtitle">View total billed, total paid, and outstanding balances per customer</p>
             </div>
+            <div>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="🔍 Search customer or contact..."
+                value={customerSearch}
+                onChange={e => setCustomerSearch(e.target.value)}
+                style={{ width: '280px', padding: '0.4rem 0.75rem', fontSize: '0.85rem' }}
+              />
+            </div>
+          </div>
 
-            {filteredSales.length === 0 ? (
-              <div className="sm-empty-state">
-                <div className="sm-empty-icon">🧾</div>
-                <p>No {ledgerFilter.toLowerCase()} sales transactions found.</p>
+          {filteredCustomerBalances.length === 0 ? (
+            <div className="sm-empty-state">
+              <div className="sm-empty-icon">👥</div>
+              <p>No customer records found.</p>
+            </div>
+          ) : (
+            <div className="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Customer Name</th>
+                    <th>Contact Info</th>
+                    <th>Total Billed</th>
+                    <th>Total Paid</th>
+                    <th>Outstanding Balance</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredCustomerBalances.map(c => {
+                    const outstanding = c.billed - c.paid;
+                    return (
+                      <tr key={c.name.toLowerCase()}>
+                        <td><strong>{c.name}</strong></td>
+                        <td><span className="customer-contact">{c.contact}</span></td>
+                        <td>Rs {c.billed.toFixed(2)}</td>
+                        <td className="color-emerald">Rs {c.paid.toFixed(2)}</td>
+                        <td className={outstanding > 0 ? "profit-amount-neg" : "profit-amount-pos"} style={{ fontWeight: 'bold' }}>
+                          Rs {outstanding.toFixed(2)}
+                        </td>
+                        <td>
+                          <span className={`sm-type-badge ${outstanding > 0 ? 'type-bird' : 'type-egg'}`} style={{ fontSize: '0.7rem' }}>
+                            {outstanding > 0 ? '⏳ Owes Money' : '✅ Fully Paid'}
+                          </span>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-xs-custom"
+                            onClick={() => {
+                              setIsNewCustomer(false);
+                              setPaymentCustomer(c.name);
+                              setPaymentContact(c.contact === 'N/A' ? '' : c.contact);
+                              setPaymentAmount(outstanding > 0 ? outstanding : 0);
+                              setPaymentDetails('Customer Balance Payment');
+                              setIsPaymentModalOpen(true);
+                            }}
+                          >
+                            💳 Receive Payment
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="glass-card">
+          <div className="sm-card-header">
+            <div>
+              <h3>Sales Transactions Ledger</h3>
+              <p className="chart-subtitle">{sales.length} invoices · Rs {totalRevenue.toFixed(2)} total revenue</p>
+            </div>
+            <div className="ledger-filter-controls">
+              <button 
+                type="button"
+                className={`ledger-filter-btn ${ledgerFilter === 'All' ? 'active' : ''}`} 
+                onClick={() => setLedgerFilter('All')}
+              >
+                All
+              </button>
+              <button 
+                type="button"
+                className={`ledger-filter-btn ${ledgerFilter === 'Bird' ? 'active' : ''}`} 
+                onClick={() => setLedgerFilter('Bird')}
+              >
+                🐔 Bird Profit
+              </button>
+              <button 
+                type="button"
+                className={`ledger-filter-btn ${ledgerFilter === 'Egg' ? 'active' : ''}`} 
+                onClick={() => setLedgerFilter('Egg')}
+              >
+                🥚 Egg Profit
+              </button>
+            </div>
+          </div>
+
+          {sales.length === 0 ? (
+            <div className="sm-empty-state">
+              <div className="sm-empty-icon">🧾</div>
+              <p>No sales transactions recorded yet.</p>
+            </div>
+          ) : (
+            <>
+              {/* Mini-stats summary bar */}
+              <div className="ledger-summary-bar">
+                <div className="ledger-summary-card">
+                  <span className="ledger-summary-label">Revenue (Selected)</span>
+                  <span className="ledger-summary-value color-emerald">
+                    Rs {filteredRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="ledger-summary-card">
+                  <span className="ledger-summary-label">Initial Cost</span>
+                  <span className="ledger-summary-value color-rose">
+                    Rs {filteredCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="ledger-summary-card">
+                  <span className="ledger-summary-label">Net Profit</span>
+                  <span className={`ledger-summary-value ${filteredProfit >= 0 ? 'color-emerald' : 'color-rose'}`}>
+                    Rs {filteredProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
               </div>
-            ) : (
-              <div className="table-wrapper">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Invoice ID</th>
-                      <th>Date</th>
-                      <th>Customer</th>
-                      <th>Type</th>
-                      <th>Qty Sold</th>
-                      <th>Unit Price</th>
-                      <th>Total</th>
-                      <th>Profit</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[...filteredSales].sort((a, b) => b.date.localeCompare(a.date)).map(s => {
-                      const cost = s.type === 'Bird' ? (batches.find(b => b.id === s.batchId)?.purchasePrice ?? 0) * s.quantity : 0;
-                      const profit = s.totalAmount - cost;
-                      return (
-                        <tr key={s.id}>
-                          <td><span className="invoice-badge">{s.invoiceId}</span></td>
-                          <td>{s.date}</td>
-                          <td>
-                            <div className="customer-cell">
-                              <strong>{s.customerName}</strong>
-                              {s.customerContact && <span className="customer-contact">{s.customerContact}</span>}
-                            </div>
-                          </td>
-                          <td>
-                            <span className={`sm-type-badge ${s.type === 'Bird' ? 'type-bird' : 'type-egg'}`}>
-                              {s.type === 'Bird' ? '🐔 Bird' : '🥚 Egg'}
-                            </span>
-                          </td>
-                          <td>
-                            {s.quantity.toLocaleString()} {s.type === 'Bird' ? 'birds' : 'eggs'}
-                            {s.type === 'Bird' && s.weightKg && (
-                              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
-                                ({s.weightKg.toLocaleString()} kg)
+
+              {filteredSales.length === 0 ? (
+                <div className="sm-empty-state">
+                  <div className="sm-empty-icon">🧾</div>
+                  <p>No {ledgerFilter.toLowerCase()} sales transactions found.</p>
+                </div>
+              ) : (
+                <div className="table-wrapper">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Invoice ID</th>
+                        <th>Date</th>
+                        <th>Customer</th>
+                        <th>Type</th>
+                        <th>Qty Sold</th>
+                        <th>Unit Price</th>
+                        <th>Financial Details</th>
+                        <th>Profit</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...filteredSales].sort((a, b) => getSaleTimestamp(b) - getSaleTimestamp(a)).map(s => {
+                        const cost = s.type === 'Bird' ? (batches.find(b => b.id === s.batchId)?.purchasePrice ?? 0) * s.quantity : 0;
+                        const profit = s.totalAmount - cost;
+                        return (
+                          <tr key={s.id}>
+                            <td><span className="invoice-badge">{s.invoiceId}</span></td>
+                            <td>{s.date}</td>
+                            <td>
+                              <div className="customer-cell">
+                                <strong>{s.customerName}</strong>
+                                {s.customerContact && <span className="customer-contact">{s.customerContact}</span>}
                               </div>
-                            )}
-                          </td>
-                          <td>
-                            {s.type === 'Bird' && s.weightKg && s.pricePerKg ? (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-                                <span>Rs {s.pricePerKg.toFixed(2)} / kg</span>
-                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                                  (Rs {s.unitPrice.toFixed(2)} / bird)
+                            </td>
+                            <td>
+                              {s.totalAmount === 0 ? (
+                                <span className="sm-type-badge" style={{ backgroundColor: 'rgba(56,189,248,0.12)', color: '#38bdf8' }}>
+                                  💳 Payment
                                 </span>
-                              </div>
-                            ) : (
-                              `Rs ${s.unitPrice.toFixed(2)}`
-                            )}
-                          </td>
-                          <td>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', alignItems: 'flex-start' }}>
-                              <strong className="revenue-amount">Rs {s.totalAmount.toFixed(2)}</strong>
-                              {paidIds.has(s.id) && (
-                                <span className="paid-status-badge">✅ Paid</span>
+                              ) : (
+                                <span className={`sm-type-badge ${s.type === 'Bird' ? 'type-bird' : 'type-egg'}`}>
+                                  {s.type === 'Bird' ? '🐔 Bird' : '🥚 Egg'}
+                                </span>
                               )}
-                            </div>
-                          </td>
-                          <td>
-                            <strong className={profit >= 0 ? "profit-amount-pos" : "profit-amount-neg"}>
-                              Rs {profit.toFixed(2)}
-                            </strong>
-                          </td>
-                          <td>
-                            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                              <button type="button" className="btn btn-secondary btn-xs-custom" onClick={() => handleViewInvoice(s)}>
-                                👁️ Invoice
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-secondary btn-xs-custom"
-                                onClick={() => handleOpenEditSale(s)}
-                              >
-                                ✏️ Edit
-                              </button>
-                              <button
-                                type="button"
-                                className={`btn btn-xs-custom ${paidIds.has(s.id) ? 'btn-paid-active' : 'btn-mark-paid'}`}
-                                onClick={() => togglePaid(s.id)}
-                                title={paidIds.has(s.id) ? 'Mark as unpaid' : 'Mark as paid'}
-                              >
-                                {paidIds.has(s.id) ? '🔄 Unmark' : '✅ Mark Paid'}
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </>
-        )}
-      </div>
+                            </td>
+                            <td>
+                              {s.totalAmount === 0 ? (
+                                '—'
+                              ) : (
+                                <>
+                                  {s.quantity.toLocaleString()} {s.type === 'Bird' ? 'birds' : 'eggs'}
+                                  {s.type === 'Bird' && s.weightKg && (
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
+                                      ({s.weightKg.toLocaleString()} kg)
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                            </td>
+                            <td>
+                              {s.totalAmount === 0 ? (
+                                '—'
+                              ) : s.type === 'Bird' && s.weightKg && s.pricePerKg ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                                  <span>Rs {s.pricePerKg.toFixed(2)} / kg</span>
+                                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                                    (Rs {s.unitPrice.toFixed(2)} / bird)
+                                  </span>
+                                </div>
+                              ) : (
+                                `Rs ${s.unitPrice.toFixed(2)}`
+                              )}
+                            </td>
+                            <td>
+                              {(() => {
+                                const priorBalance = salePriorBalances[s.id] ?? 0;
+                                const netOutstanding = priorBalance + s.totalAmount - (s.amountPaid ?? 0);
+                                return (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', alignItems: 'flex-start' }}>
+                                    {priorBalance > 0 && (
+                                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                        Old Bal: Rs {priorBalance.toFixed(2)}
+                                      </span>
+                                    )}
+                                    <span style={{ fontSize: '0.85rem' }}>Billed: <strong>Rs {s.totalAmount.toFixed(2)}</strong></span>
+                                    <span style={{ fontSize: '0.78rem', color: 'var(--color-emerald)' }}>Paid: Rs {(s.amountPaid ?? 0).toFixed(2)}</span>
+                                    {netOutstanding > 0 ? (
+                                      <span style={{ fontSize: '0.78rem', color: 'var(--color-rose)', fontWeight: 'bold' }}>
+                                        Net Due: Rs {netOutstanding.toFixed(2)}
+                                      </span>
+                                    ) : (
+                                      <span className="paid-status-badge">✅ Paid</span>
+                                    )}
+                                  </div>
+                                );
+                              })()}
+                            </td>
+                            <td>
+                              {s.totalAmount === 0 ? (
+                                '—'
+                              ) : (
+                                <strong className={profit >= 0 ? "profit-amount-pos" : "profit-amount-neg"}>
+                                  Rs {profit.toFixed(2)}
+                                </strong>
+                              )}
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                <button type="button" className="btn btn-secondary btn-xs-custom" onClick={() => handleViewInvoice(s)}>
+                                  👁️ Invoice
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary btn-xs-custom"
+                                  onClick={() => handleOpenEditSale(s)}
+                                >
+                                  ✏️ Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  className={`btn btn-xs-custom ${paidIds.has(s.id) ? 'btn-paid-active' : 'btn-mark-paid'}`}
+                                  onClick={() => togglePaid(s.id)}
+                                  title={paidIds.has(s.id) ? 'Mark as unpaid' : 'Mark as paid'}
+                                >
+                                  {paidIds.has(s.id) ? '🔄 Unmark' : '✅ Mark Paid'}
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {/* ── Edit Sale Modal ── */}
       <Modal
@@ -520,6 +890,56 @@ export const SalesMgmt: React.FC = () => {
             </div>
           )}
 
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Transport Charges (Rs)</label>
+              <input 
+                type="number" 
+                step="0.01" 
+                min="0" 
+                className="form-control" 
+                value={editSaleTransport} 
+                onChange={e => setEditSaleTransport(Number(e.target.value))} 
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Other Charges (Rs)</label>
+              <input 
+                type="number" 
+                step="0.01" 
+                min="0" 
+                className="form-control" 
+                value={editSaleOther} 
+                onChange={e => setEditSaleOther(Number(e.target.value))} 
+              />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Old Balance (Rs)</label>
+              <input 
+                type="number" 
+                step="0.01" 
+                className="form-control" 
+                value={editSaleOldBalance} 
+                onChange={e => setEditSaleOldBalance(Number(e.target.value))} 
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Amount Paid (Rs)</label>
+              <input 
+                type="number" 
+                step="0.01" 
+                min="0" 
+                className="form-control" 
+                value={editSaleAmountPaid} 
+                onChange={e => setEditSaleAmountPaid(Number(e.target.value))} 
+                required 
+              />
+            </div>
+          </div>
+
           <div className="form-group">
             <label className="form-label">Details / Remarks</label>
             <input type="text" className="form-control" value={editSaleDetails} onChange={e => setEditSaleDetails(e.target.value)} maxLength={256} />
@@ -536,31 +956,68 @@ export const SalesMgmt: React.FC = () => {
               gap: '0.4rem',
               marginTop: '0.5rem'
             }}>
-              {editSaleType === 'Bird' && (batches.find(b => b.id === editSaleBatchId)?.type === 'Broiler' || editSaleWeightKg > 0) ? (
-                <>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
-                    <span>Total Weight</span>
-                    <strong>{editSaleWeightKg.toLocaleString()} kg</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
-                    <span>Price per Kg</span>
-                    <strong>Rs {editSalePricePerKg.toFixed(2)}/kg</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    <span>Implied Unit Price</span>
-                    <span>Rs {((editSaleWeightKg * editSalePricePerKg) / editSaleQty).toFixed(2)}/bird</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1rem', fontWeight: '700', color: 'var(--color-emerald)', borderTop: '1px solid rgba(16,185,129,0.2)', paddingTop: '0.4rem', marginTop: '0.2rem' }}>
-                    <span>Subtotal</span>
-                    <strong>Rs {(editSaleWeightKg * editSalePricePerKg).toFixed(2)}</strong>
-                  </div>
-                </>
-              ) : (
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
-                  <span>Subtotal</span>
-                  <strong>Rs {(editSaleQty * editSaleUnitPrice).toFixed(2)}</strong>
-                </div>
-              )}
+              {(() => {
+                const subtotal = editSaleType === 'Bird' && editSaleWeightKg > 0
+                  ? Number(editSaleWeightKg) * Number(editSalePricePerKg)
+                  : Number(editSaleQty) * Number(editSaleUnitPrice);
+                const grandTotal = subtotal + editSaleTransport + editSaleOther;
+                const totalOutstanding = grandTotal + editSaleOldBalance;
+                const remaining = totalOutstanding - editSaleAmountPaid;
+                return (
+                  <>
+                    {editSaleType === 'Bird' && editSaleWeightKg > 0 && (
+                      <>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
+                          <span>Total Weight</span>
+                          <strong>{editSaleWeightKg.toLocaleString()} kg</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
+                          <span>Price per Kg</span>
+                          <strong>Rs {editSalePricePerKg.toFixed(2)}/kg</strong>
+                        </div>
+                      </>
+                    )}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
+                      <span>Subtotal</span>
+                      <strong>Rs {subtotal.toFixed(2)}</strong>
+                    </div>
+                    {editSaleTransport > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
+                        <span>Transport Charges</span>
+                        <strong>+ Rs {editSaleTransport.toFixed(2)}</strong>
+                      </div>
+                    )}
+                    {editSaleOther > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
+                        <span>Other Charges</span>
+                        <strong>+ Rs {editSaleOther.toFixed(2)}</strong>
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.92rem', color: 'var(--text-primary)', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem' }}>
+                      <span>Grand Total</span>
+                      <strong>Rs {grandTotal.toFixed(2)}</strong>
+                    </div>
+                    {editSaleOldBalance > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: 'var(--text-muted)' }}>
+                        <span>Old Balance</span>
+                        <strong>+ Rs {editSaleOldBalance.toFixed(2)}</strong>
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1rem', fontWeight: '700', color: 'var(--color-emerald)', borderTop: '1px solid rgba(16,185,129,0.2)', paddingTop: '0.4rem', marginTop: '0.2rem' }}>
+                      <span>Total Outstanding</span>
+                      <strong>Rs {totalOutstanding.toFixed(2)}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: 'var(--color-emerald)' }}>
+                      <span>Amount Paid</span>
+                      <strong>Rs {editSaleAmountPaid.toFixed(2)}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.92rem', fontWeight: 'bold', color: remaining > 0 ? 'var(--color-rose)' : 'var(--color-emerald)', borderTop: '1px dashed rgba(255,255,255,0.1)', paddingTop: '0.25rem' }}>
+                      <span>{remaining > 0 ? 'Balance Due' : 'Change/Overpaid'}</span>
+                      <strong>Rs {Math.abs(remaining).toFixed(2)}</strong>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           )}
         </form>
@@ -572,10 +1029,22 @@ export const SalesMgmt: React.FC = () => {
         onClose={() => setIsInvoiceOpen(false)}
         title={``}
         footer={
-          <>
-            <button className="btn btn-secondary" onClick={() => setIsInvoiceOpen(false)}>Close</button>
-            <button className="btn btn-primary" onClick={handlePrint}>🖨️ Print Invoice</button>
-          </>
+          <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
+            <button
+              className="btn btn-success"
+              type="button"
+              onClick={async () => {
+                await handleSavePayment();
+                alert('Payment updated successfully!');
+              }}
+            >
+              💾 Save Payment
+            </button>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button className="btn btn-secondary" onClick={() => setIsInvoiceOpen(false)}>Close</button>
+              <button className="btn btn-primary" onClick={handlePrint}>🖨️ Print Invoice</button>
+            </div>
+          </div>
         }
       >
         {activeInvoice && (
@@ -588,7 +1057,7 @@ export const SalesMgmt: React.FC = () => {
                 <p className="inv-address">📞 +94768470361</p>
               </div>
               <div className="invoice-id-block">
-                <div className="invoice-label">INVOICE</div>
+                <div className="invoice-label">{activeInvoice.totalAmount === 0 ? 'PAYMENT RECEIPT' : 'INVOICE'}</div>
                 <div className="invoice-meta-row"><span>No:</span><strong>{activeInvoice.invoiceId}</strong></div>
                 <div className="invoice-meta-row"><span>Date:</span><strong>{activeInvoice.date}</strong></div>
               </div>
@@ -632,150 +1101,206 @@ export const SalesMgmt: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td>
-                    <div className="inv-item-desc">
-                      {activeInvoice.type === 'Bird'
-                        ? `Live Poultry Birds (Batch: ${activeInvoice.batchId})`
-                        : 'Fresh Eggs'}
-                    </div>
-                    {activeInvoice.weightKg && (
-                      <div className="inv-item-note">
-                        Weight-based sale: {activeInvoice.weightKg.toLocaleString()} kg
+                {activeInvoice.totalAmount === 0 ? (
+                  <tr>
+                    <td>
+                      <div className="inv-item-desc">Customer Payment Received</div>
+                      {activeInvoice.details && (
+                        <div className="inv-item-note">{activeInvoice.details}</div>
+                      )}
+                    </td>
+                    <td>—</td>
+                    <td>—</td>
+                    <td><strong>Rs {amountPaid.toFixed(2)}</strong></td>
+                  </tr>
+                ) : (
+                  <tr>
+                    <td>
+                      <div className="inv-item-desc">
+                        {activeInvoice.type === 'Bird'
+                          ? `Live Poultry Birds (Batch: ${activeInvoice.batchId})`
+                          : 'Fresh Eggs'}
                       </div>
-                    )}
-                    {activeInvoice.details && (
-                      <div className="inv-item-note">{activeInvoice.details}</div>
-                    )}
-                  </td>
-                  <td>
-                    {activeInvoice.quantity.toLocaleString()} {activeInvoice.type === 'Bird' ? 'birds' : 'eggs'}
-                    {activeInvoice.weightKg && (
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
-                        ({activeInvoice.weightKg.toLocaleString()} kg total)
-                      </div>
-                    )}
-                  </td>
-                  <td>
-                    {activeInvoice.weightKg && activeInvoice.pricePerKg ? (
-                      <>
-                        Rs {activeInvoice.pricePerKg.toFixed(2)} / kg
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
-                          (Rs {activeInvoice.unitPrice.toFixed(2)} / bird)
+                      {activeInvoice.weightKg && (
+                        <div className="inv-item-note">
+                          Weight-based sale: {activeInvoice.weightKg.toLocaleString()} kg
                         </div>
-                      </>
-                    ) : (
-                      `Rs ${activeInvoice.unitPrice.toFixed(2)}`
-                    )}
-                  </td>
-                  <td><strong>Rs {activeInvoice.totalAmount.toFixed(2)}</strong></td>
-                </tr>
+                      )}
+                      {activeInvoice.details && (
+                        <div className="inv-item-note">{activeInvoice.details}</div>
+                      )}
+                    </td>
+                    <td>
+                      {activeInvoice.quantity.toLocaleString()} {activeInvoice.type === 'Bird' ? 'birds' : 'eggs'}
+                      {activeInvoice.weightKg && (
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
+                          ({activeInvoice.weightKg.toLocaleString()} kg total)
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      {activeInvoice.weightKg && activeInvoice.pricePerKg ? (
+                        <>
+                          Rs {activeInvoice.pricePerKg.toFixed(2)} / kg
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
+                            (Rs {activeInvoice.unitPrice.toFixed(2)} / bird)
+                          </div>
+                        </>
+                      ) : (
+                        `Rs ${activeInvoice.unitPrice.toFixed(2)}`
+                      )}
+                    </td>
+                    <td><strong>Rs {((activeInvoice.weightKg && activeInvoice.pricePerKg ? activeInvoice.weightKg * activeInvoice.pricePerKg : activeInvoice.quantity * activeInvoice.unitPrice)).toFixed(2)}</strong></td>
+                  </tr>
+                )}
               </tbody>
             </table>
 
             <div className="invoice-calculations">
-              <div className="calc-row"><span>Subtotal:</span><span>Rs {activeInvoice.totalAmount.toFixed(2)}</span></div>
+              {activeInvoice.totalAmount === 0 ? (
+                <>
+                  <div className="calc-row grand-total">
+                    <span>Amount Received:</span>
+                    <span>Rs {amountPaid.toFixed(2)}</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {(() => {
+                    const savedTransport = activeInvoice.transportCharges || 0;
+                    const savedOther = activeInvoice.otherCharges || 0;
+                    const subtotal = activeInvoice.totalAmount - savedTransport - savedOther;
+                    const totalExtras = extraCharges.reduce((s, c) => s + c.amount, 0);
+                    const grandTotal = activeInvoice.totalAmount + totalExtras;
+                    const totalToPay = grandTotal + oldBalance;
+                    const change = amountPaid - totalToPay;
+                    return (
+                      <>
+                        <div className="calc-row"><span>Subtotal:</span><span>Rs {subtotal.toFixed(2)}</span></div>
+                        
+                        {savedTransport > 0 && (
+                          <div className="calc-row charge-addition">
+                            <span>+ Transport Charges:</span>
+                            <span className="charge-pos-val">Rs {savedTransport.toFixed(2)}</span>
+                          </div>
+                        )}
+                        {savedOther > 0 && (
+                          <div className="calc-row charge-addition">
+                            <span>+ Other Charges:</span>
+                            <span className="charge-pos-val">Rs {savedOther.toFixed(2)}</span>
+                          </div>
+                        )}
 
-              {/* ── Extra Charges ── */}
-              {extraCharges.map((c, i) => (
-                <div key={i} className={`calc-row extra-charge-row ${c.amount < 0 ? 'charge-deduction' : 'charge-addition'}`}>
-                  <span>{c.amount < 0 ? '− ' : '+ '}{c.label}:</span>
-                  <span className="extra-charge-right">
-                    <span className={c.amount < 0 ? 'charge-neg-val' : 'charge-pos-val'}>
-                      {c.amount < 0 ? '−' : '+'} Rs {Math.abs(c.amount).toFixed(2)}
-                    </span>
-                    <button
-                      type="button"
-                      className="remove-charge-btn"
-                      onClick={() => {
-                        const updated = extraCharges.filter((_, idx) => idx !== i);
-                        setExtraCharges(updated);
-                        // Do NOT override amountPaid — user may have already set a custom value
-                      }}
-                      title="Remove charge"
-                    >✕</button>
-                  </span>
-                </div>
-              ))}
+                        {/* ── Extra Charges ── */}
+                        {extraCharges.map((c, i) => (
+                          <div key={i} className={`calc-row extra-charge-row ${c.amount < 0 ? 'charge-deduction' : 'charge-addition'}`}>
+                            <span>{c.amount < 0 ? '− ' : '+ '}{c.label}:</span>
+                            <span className="extra-charge-right">
+                              <span className={c.amount < 0 ? 'charge-neg-val' : 'charge-pos-val'}>
+                                {c.amount < 0 ? '−' : '+'} Rs {Math.abs(c.amount).toFixed(2)}
+                              </span>
+                              <button
+                                type="button"
+                                className="remove-charge-btn"
+                                onClick={() => {
+                                  const updated = extraCharges.filter((_, idx) => idx !== i);
+                                  setExtraCharges(updated);
+                                }}
+                                title="Remove charge"
+                              >✕</button>
+                            </span>
+                          </div>
+                        ))}
 
-              {/* ── Add Charge Row ── */}
-              <div className="add-charge-row">
-                <select
-                  className="charge-label-select"
-                  value={newChargeLabel}
-                  onChange={e => setNewChargeLabel(e.target.value)}
-                >
-                  <option>Transport</option>
-                  <option>Packing</option>
-                  <option>Loading</option>
-                  <option>Handling</option>
-                  <option>Discount</option>
-                  <option>Advance Deduction</option>
-                  <option>Other</option>
-                </select>
-                {/* ± toggle: positive or negative */}
-                <button
-                  type="button"
-                  className={`charge-sign-toggle ${newChargeAmount < 0 ? 'sign-neg' : 'sign-pos'}`}
-                  title={newChargeAmount < 0 ? 'Currently Deduction (−). Click to switch to Addition (+)' : 'Currently Addition (+). Click to switch to Deduction (−)'}
-                  onClick={() => setNewChargeAmount(prev => prev === 0 ? -0.01 : -prev)}
-                >
-                  {newChargeAmount < 0 ? '−' : '+'}
-                </button>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  className="charge-amount-input"
-                  placeholder="Amount"
-                  value={newChargeAmount === 0 ? '' : Math.abs(newChargeAmount)}
-                  onChange={e => {
-                    const abs = Math.abs(Number(e.target.value));
-                    setNewChargeAmount(newChargeAmount < 0 ? -abs : abs);
-                  }}
-                />
-                <button
-                  type="button"
-                  className="add-charge-btn"
-                  onClick={() => {
-                    if (newChargeAmount !== 0) {
-                      const newCharge = { label: newChargeLabel, amount: newChargeAmount };
-                      const updated = [...extraCharges, newCharge];
-                      setExtraCharges(updated);
-                      // Do NOT override amountPaid — user may have already set a custom value
-                      setNewChargeAmount(0);
-                    }
-                  }}
-                >+ Add</button>
-              </div>
+                        {/* ── Add Charge Row ── */}
+                        <div className="add-charge-row">
+                          <select
+                            className="charge-label-select"
+                            value={newChargeLabel}
+                            onChange={e => setNewChargeLabel(e.target.value)}
+                          >
+                            <option>Transport</option>
+                            <option>Packing</option>
+                            <option>Loading</option>
+                            <option>Handling</option>
+                            <option>Discount</option>
+                            <option>Advance Deduction</option>
+                            <option>Other</option>
+                          </select>
+                          <button
+                            type="button"
+                            className={`charge-sign-toggle ${newChargeAmount < 0 ? 'sign-neg' : 'sign-pos'}`}
+                            title={newChargeAmount < 0 ? 'Currently Deduction. Click to switch' : 'Currently Addition. Click to switch'}
+                            onClick={() => setNewChargeAmount(prev => prev === 0 ? -0.01 : -prev)}
+                          >
+                            {newChargeAmount < 0 ? '−' : '+'}
+                          </button>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            className="charge-amount-input"
+                            placeholder="Amount"
+                            value={newChargeAmount === 0 ? '' : Math.abs(newChargeAmount)}
+                            onChange={e => {
+                              const abs = Math.abs(Number(e.target.value));
+                              setNewChargeAmount(newChargeAmount < 0 ? -abs : abs);
+                            }}
+                          />
+                          <button
+                            type="button"
+                            className="add-charge-btn"
+                            onClick={() => {
+                              if (newChargeAmount !== 0) {
+                                const newCharge = { label: newChargeLabel, amount: newChargeAmount };
+                                setExtraCharges([...extraCharges, newCharge]);
+                                setNewChargeAmount(0);
+                              }
+                            }}
+                          >+ Add</button>
+                        </div>
 
-              {/* ── Grand Total ── */}
-              {(() => {
-                const totalExtras = extraCharges.reduce((s, c) => s + c.amount, 0);
-                const grandTotal = activeInvoice.totalAmount + totalExtras;
-                const change = amountPaid - grandTotal;
-                return (
-                  <>
-                    <div className="calc-row grand-total"><span>Grand Total:</span><span>Rs {grandTotal.toFixed(2)}</span></div>
-                    {/* ── Balance Section ── */}
-                    <div className="calc-row payment-given-row">
-                      <span>Payment Given:</span>
-                      <span>Rs {amountPaid.toFixed(2)}</span>
-                    </div>
-                    {change >= 0 ? (
-                      <div className="calc-row balance-row change-positive">
-                        <span>Change to Return:</span>
-                        <span>Rs {change.toFixed(2)}</span>
-                      </div>
-                    ) : (
-                      <div className="calc-row balance-row balance-due">
-                        <span>Balance Due:</span>
-                        <span>Rs {(-change).toFixed(2)}</span>
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
+                        <div className="calc-row grand-total"><span>Grand Total:</span><span>Rs {grandTotal.toFixed(2)}</span></div>
+                        
+                        {/* Historical Running Balances */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', width: '100%' }}>
+                          <div className="calc-row" style={{ borderTop: '1px dashed var(--border-color)', paddingTop: '0.4rem', marginTop: '0.2rem' }}>
+                            <span>Old Balance:</span>
+                            <strong>Rs {oldBalance.toFixed(2)}</strong>
+                          </div>
+                          <div className="calc-row" style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>
+                            <span>Current Outstanding Balance:</span>
+                            <strong>Rs {Math.max(0, grandTotal - amountPaid).toFixed(2)}</strong>
+                          </div>
+                        </div>
+
+                        {/* Payment row (transaction-specific) */}
+                        <div className="calc-row payment-given-row">
+                          <span>Payment Given:</span>
+                          <span>Rs {amountPaid.toFixed(2)}</span>
+                        </div>
+
+                        {/* Dynamic balances including historical */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', width: '100%' }}>
+                          {change >= 0 ? (
+                            change > 0 && (
+                              <div className="calc-row balance-row change-positive">
+                                <span>Change to Return / Credit:</span>
+                                <strong>Rs {change.toFixed(2)}</strong>
+                              </div>
+                            )
+                          ) : (
+                            <div className="calc-row balance-row balance-due" style={{ color: 'var(--color-rose)' }}>
+                              <span>Final Net Due:</span>
+                              <strong>Rs {(-change).toFixed(2)}</strong>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    );
+                  })()}
+                </>
+              )}
             </div>
 
             <div className="invoice-footer-notes">
@@ -1121,11 +1646,134 @@ export const SalesMgmt: React.FC = () => {
           .inv-paid-input-header { display: none !important; }
           .inv-paid-print-value { display: block !important; }
           .charge-sign-toggle { display: none !important; }
+          .print-only-row { display: flex !important; }
           /* Hide browser default running head/foot */
           html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
         .inv-paid-print-value { display: none; font-size: 0.95rem; font-weight: 700; color: #e2e8f0; }
+        .print-only-row { display: none !important; }
       `}</style>
+
+      {/* ── Receive Customer Payment Modal ── */}
+      <Modal
+        isOpen={isPaymentModalOpen}
+        onClose={() => setIsPaymentModalOpen(false)}
+        title="💳 Receive Customer Payment"
+        footer={
+          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', width: '100%' }}>
+            <button className="btn btn-secondary" type="button" onClick={() => setIsPaymentModalOpen(false)}>Cancel</button>
+            <button className="btn btn-success" type="button" onClick={handlePaymentSubmit}>Record Payment</button>
+          </div>
+        }
+      >
+        <form onSubmit={handlePaymentSubmit} className="modal-form-grid">
+          <div className="form-group">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+              <label className="form-label" style={{ margin: 0 }}>Customer Type</label>
+              <button 
+                type="button" 
+                className="btn btn-xs-custom" 
+                onClick={() => {
+                  setIsNewCustomer(!isNewCustomer);
+                  setPaymentCustomer('');
+                  setNewCustomerName('');
+                  setPaymentContact('');
+                }}
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)' }}
+              >
+                {isNewCustomer ? 'Select Existing Customer' : 'Add New Customer'}
+              </button>
+            </div>
+            
+            {isNewCustomer ? (
+              <input 
+                type="text" 
+                className="form-control" 
+                placeholder="Enter customer name..." 
+                value={newCustomerName} 
+                onChange={e => setNewCustomerName(e.target.value)} 
+                required 
+              />
+            ) : (
+              <select 
+                className="form-control" 
+                value={paymentCustomer} 
+                onChange={e => {
+                  setPaymentCustomer(e.target.value);
+                  const match = customerBalances.find(cb => cb.name === e.target.value);
+                  if (match) {
+                    setPaymentContact(match.contact === 'N/A' ? '' : match.contact);
+                    const outstanding = match.billed - match.paid;
+                    setPaymentAmount(outstanding > 0 ? outstanding : 0);
+                  }
+                }} 
+                required
+              >
+                <option value="">Choose customer...</option>
+                {uniqueCustomerNames.map(name => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Contact Number</label>
+              <input 
+                type="text" 
+                className="form-control" 
+                placeholder="Phone number..." 
+                value={paymentContact} 
+                onChange={e => setPaymentContact(e.target.value)} 
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Payment Date</label>
+              <input 
+                type="date" 
+                className="form-control" 
+                value={paymentDate} 
+                onChange={e => setPaymentDate(e.target.value)} 
+                required 
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Payment Amount (Rs)</label>
+            <input 
+              type="number" 
+              step="0.01" 
+              min="0.01" 
+              className="form-control" 
+              placeholder="0.00" 
+              value={paymentAmount || ''} 
+              onChange={e => setPaymentAmount(Number(e.target.value))} 
+              required 
+            />
+            {!isNewCustomer && paymentCustomer && (
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.15rem', display: 'block' }}>
+                Current Outstanding Balance: Rs {(() => {
+                  const match = customerBalances.find(cb => cb.name === paymentCustomer);
+                  return match ? (match.billed - match.paid).toFixed(2) : '0.00';
+                })()}
+              </span>
+            )}
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Payment Details / Notes</label>
+            <input 
+              type="text" 
+              className="form-control" 
+              placeholder="e.g. Cash, Bank Transfer, Cheque..." 
+              value={paymentDetails} 
+              onChange={e => setPaymentDetails(e.target.value)} 
+            />
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

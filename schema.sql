@@ -83,6 +83,7 @@ CREATE TABLE IF NOT EXISTS sales (
     quantity NUMERIC NOT NULL,
     unit_price NUMERIC NOT NULL,
     total_amount NUMERIC NOT NULL,
+    amount_paid NUMERIC DEFAULT 0,
     batch_id TEXT REFERENCES batches(id) ON DELETE SET NULL,
     details TEXT,
     weight_kg NUMERIC,
@@ -147,4 +148,6 @@ ALTER TABLE batches ADD COLUMN IF NOT EXISTS initial_quantity_kg NUMERIC;
 ALTER TABLE batches ADD COLUMN IF NOT EXISTS purchase_price_per_kg NUMERIC;
 ALTER TABLE sales ADD COLUMN IF NOT EXISTS weight_kg NUMERIC;
 ALTER TABLE sales ADD COLUMN IF NOT EXISTS price_per_kg NUMERIC;
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS amount_paid NUMERIC DEFAULT 0;
+
 
