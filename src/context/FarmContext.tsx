@@ -178,7 +178,7 @@ interface FarmContextType {
   registerUser: (user: UserCredential) => { success: boolean; message: string };
   approveUser: (username: string) => void;
   updateUserRole: (username: string, role: UserRole) => void;
-  updateUserProfile: (oldUsername: string, newUsername: string, newPassword?: string) => { success: boolean; message: string };
+  updateUserProfile: (oldUsername: string, newUsername: string, newPassword?: string, oldPassword?: string) => { success: boolean; message: string };
   deleteUser: (username: string) => void;
   isLoading: boolean;
 }
@@ -517,11 +517,18 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateUserProfile = (
     oldUsername: string,
     newUsername: string,
-    newPassword?: string
+    newPassword?: string,
+    oldPassword?: string
   ): { success: boolean; message: string } => {
     const trimmedNewUsername = newUsername.trim();
     if (!trimmedNewUsername) {
       return { success: false, message: 'Username cannot be empty.' };
+    }
+
+    // Find the user to update to check their password
+    const userToUpdate = usersList.find(u => u.username.toLowerCase() === oldUsername.toLowerCase());
+    if (!userToUpdate) {
+      return { success: false, message: 'User not found.' };
     }
 
     // If username is changing, check if it is taken
@@ -534,8 +541,17 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
-    if (newPassword && newPassword.length < 4) {
-      return { success: false, message: 'Password must be at least 4 characters.' };
+    // If a new password is provided, we MUST verify the old password
+    if (newPassword) {
+      if (!oldPassword) {
+        return { success: false, message: 'Please provide your current password to set a new password.' };
+      }
+      if (userToUpdate.password !== oldPassword) {
+        return { success: false, message: 'Incorrect current password.' };
+      }
+      if (newPassword.length < 4) {
+        return { success: false, message: 'Password must be at least 4 characters.' };
+      }
     }
 
     setUsersList(prev =>

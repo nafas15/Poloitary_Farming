@@ -13,6 +13,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
   const { currentUser, logout, updateUserProfile, deleteUser } = useFarm();
   const [modalOpen, setModalOpen] = useState(false);
   const [editUsername, setEditUsername] = useState('');
+  const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [profileError, setProfileError] = useState('');
@@ -29,24 +30,35 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
       return;
     }
 
-    if (newPassword && newPassword.length < 4) {
-      setProfileError('Password must be at least 4 characters');
-      return;
-    }
-
-    if (newPassword && newPassword !== confirmNewPassword) {
-      setProfileError('Passwords do not match');
-      return;
+    if (newPassword) {
+      if (!oldPassword) {
+        setProfileError('Please enter your current password to set a new password');
+        return;
+      }
+      if (newPassword.length < 4) {
+        setProfileError('New password must be at least 4 characters');
+        return;
+      }
+      if (newPassword !== confirmNewPassword) {
+        setProfileError('Passwords do not match');
+        return;
+      }
     }
 
     setIsSavingProfile(true);
     setTimeout(() => {
       if (currentUser) {
-        const result = updateUserProfile(currentUser.username, editUsername, newPassword || undefined);
+        const result = updateUserProfile(
+          currentUser.username,
+          editUsername,
+          newPassword || undefined,
+          oldPassword || undefined
+        );
         if (result.success) {
           setProfileSuccess(result.message);
           setNewPassword('');
           setConfirmNewPassword('');
+          setOldPassword('');
           setTimeout(() => {
             setModalOpen(false);
             setProfileSuccess('');
@@ -233,7 +245,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
         </nav>
 
         <div className="sidebar-footer">
-          <div className="user-profile clickable" onClick={() => { setEditUsername(currentUser?.username || ''); setModalOpen(true); }} title="Edit Profile">
+          <div className="user-profile clickable" onClick={() => { setEditUsername(currentUser?.username || ''); setOldPassword(''); setNewPassword(''); setConfirmNewPassword(''); setModalOpen(true); }} title="Edit Profile">
             <div className="user-avatar">
               {currentUser?.username.substring(0, 2).toUpperCase()}
             </div>
@@ -585,7 +597,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
       `}</style>
     </aside>
 
-    <Modal isOpen={modalOpen} onClose={() => { setModalOpen(false); setProfileError(''); setProfileSuccess(''); }} title="Edit Profile">
+    <Modal isOpen={modalOpen} onClose={() => { setModalOpen(false); setProfileError(''); setProfileSuccess(''); setOldPassword(''); setNewPassword(''); setConfirmNewPassword(''); }} title="Edit Profile">
       <form onSubmit={handleProfileSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', marginTop: 'var(--spacing-md)' }}>
         {profileError && <div className="login-error-alert" style={{ marginBottom: 0 }}>{profileError}</div>}
         {profileSuccess && <div className="login-success-alert" style={{ marginBottom: 0 }}>{profileSuccess}</div>}
@@ -609,6 +621,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
             value={currentUser?.role || ''}
             disabled
             style={{ opacity: 0.6 }}
+          />
+        </div>
+        <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <label className="form-label" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Current Password</label>
+          <input
+            type="password"
+            className="form-control"
+            placeholder="Required if setting a new password"
+            value={oldPassword}
+            onChange={e => setOldPassword(e.target.value)}
+            disabled={isSavingProfile}
           />
         </div>
         <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
