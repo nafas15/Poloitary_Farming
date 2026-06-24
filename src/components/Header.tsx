@@ -37,6 +37,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, toggleSidebar }) => {
       case 'expenses': return 'Expense Tracker';
       case 'profit-loss': return 'Profit & Loss Statement';
       case 'reports': return 'Farm Performance Reports';
+      case 'employees': return 'Employee Management';
       default: return 'Farm Management';
     }
   };
@@ -112,8 +113,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, toggleSidebar }) => {
               </span>
             </div>
           </div>
-        )}
-      </div>
+        )}      </div>
 
       <style>{`
         .header {
@@ -288,6 +288,8 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, toggleSidebar }) => {
           .header-stat {
             width: 100%;
           }
+        }
+
         }
       `}</style>
     </header>

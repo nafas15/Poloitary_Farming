@@ -16,6 +16,7 @@ const SalesMgmt    = lazy(() => import('./pages/SalesMgmt').then(m => ({ default
 const ExpenseMgmt  = lazy(() => import('./pages/ExpenseMgmt').then(m => ({ default: m.ExpenseMgmt })));
 const ProfitLoss   = lazy(() => import('./pages/ProfitLoss').then(m => ({ default: m.ProfitLoss })));
 const Reports      = lazy(() => import('./pages/Reports').then(m => ({ default: m.Reports })));
+const EmployeeMgmt = lazy(() => import('./pages/EmployeeMgmt').then(m => ({ default: m.EmployeeMgmt })));
 
 import './styles/index.css';
 
@@ -67,6 +68,7 @@ function MainAppContent() {
       case 'expenses':     return isAdmin ? <ExpenseMgmt /> : <Dashboard />;
       case 'profit-loss':  return isAdmin ? <ProfitLoss /> : <Dashboard />;
       case 'reports':      return isAdmin ? <Reports /> : <Dashboard />;
+      case 'employees':    return isAdmin ? <EmployeeMgmt /> : <Dashboard />;
       default:             return <Dashboard />;
     }
   };

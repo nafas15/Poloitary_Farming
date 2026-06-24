@@ -1,15 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useFarm } from '../context/FarmContext';
 import type { UserRole } from '../context/FarmContext';
 
-interface UserCredential {
-  username: string;
-  password: string;
-  role: UserRole;
-}
-
 export const Login: React.FC = () => {
-  const { login } = useFarm();
+  const { login, usersList, registerUser } = useFarm();
   const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login');
   
   // Form fields
@@ -22,30 +16,6 @@ export const Login: React.FC = () => {
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-
-  // Initialize simulated users database in localStorage if it doesn't exist
-  useEffect(() => {
-    const defaultUsers: UserCredential[] = [
-      { username: 'admin', password: 'admin', role: 'Admin' },
-      { username: 'employee', password: 'employee', role: 'Employee' }
-    ];
-    if (!localStorage.getItem('poultry_users_list')) {
-      localStorage.setItem('poultry_users_list', JSON.stringify(defaultUsers));
-    }
-  }, []);
-
-  const getStoredUsers = (): UserCredential[] => {
-    try {
-      const stored = localStorage.getItem('poultry_users_list');
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  };
-
-  const saveStoredUsers = (users: UserCredential[]) => {
-    localStorage.setItem('poultry_users_list', JSON.stringify(users));
-  };
 
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,19 +31,22 @@ export const Login: React.FC = () => {
 
     // Simulate short network delay for premium experience
     setTimeout(() => {
-      const users = getStoredUsers();
-      // Match case-insensitively for username, but matching role and password exactly
-      const matchedUser = users.find(
-        u => u.username.toLowerCase() === username.trim().toLowerCase() && u.role === role
+      // Match case-insensitively for username and check password exactly
+      const matchedUser = usersList.find(
+        u => u.username.toLowerCase() === username.trim().toLowerCase()
       );
 
       if (matchedUser && matchedUser.password === password) {
-        const success = login(matchedUser.username, matchedUser.role);
-        if (!success) {
-          setError('Failed to create session. Please try again.');
+        if (!matchedUser.approved) {
+          setError('Your account is pending admin approval. Please check back later.');
+        } else {
+          const success = login(matchedUser.username, matchedUser.role);
+          if (!success) {
+            setError('Failed to create session. Please try again.');
+          }
         }
       } else {
-        setError('Invalid username or password for selected role.');
+        setError('Invalid username or password.');
       }
       setIsLoading(false);
     }, 800);
@@ -103,26 +76,21 @@ export const Login: React.FC = () => {
     setIsLoading(true);
 
     setTimeout(() => {
-      const users = getStoredUsers();
-      const userExists = users.some(
-        u => u.username.toLowerCase() === trimmedUser.toLowerCase() && u.role === role
-      );
+      const result = registerUser({
+        username: trimmedUser,
+        password,
+        role,
+        approved: false // will default to false, requiring approval
+      });
 
-      if (userExists) {
-        setError(`A user with username "${trimmedUser}" already exists as ${role}.`);
-        setIsLoading(false);
-        return;
+      if (result.success) {
+        setSuccessMsg(result.message);
+        setMode('login');
+        setPassword('');
+        setConfirmPassword('');
+      } else {
+        setError(result.message);
       }
-
-      // Add new user
-      const updatedUsers = [...users, { username: trimmedUser, password, role }];
-      saveStoredUsers(updatedUsers);
-      
-      setSuccessMsg('Account created successfully! You can now log in.');
-      setMode('login');
-      // Autofill details to make logging in easier
-      setPassword('');
-      setConfirmPassword('');
       setIsLoading(false);
     }, 800);
   };
@@ -141,9 +109,8 @@ export const Login: React.FC = () => {
     setIsLoading(true);
 
     setTimeout(() => {
-      const users = getStoredUsers();
       // Look for user matching this username
-      const matchedUser = users.find(
+      const matchedUser = usersList.find(
         u => u.username.toLowerCase() === trimmedUser.toLowerCase()
       );
 
@@ -185,32 +152,13 @@ export const Login: React.FC = () => {
         {mode === 'login' && (
           <form onSubmit={handleLoginSubmit} className="login-form">
             <h3 className="form-section-title">Sign In</h3>
-            
-            <div className="role-selector">
-              <button
-                type="button"
-                className={`role-btn ${role === 'Admin' ? 'active admin' : ''}`}
-                onClick={() => setRole('Admin')}
-                disabled={isLoading}
-              >
-                👑 Admin
-              </button>
-              <button
-                type="button"
-                className={`role-btn ${role === 'Employee' ? 'active employee' : ''}`}
-                onClick={() => setRole('Employee')}
-                disabled={isLoading}
-              >
-                🧑‍🌾 Employee
-              </button>
-            </div>
 
             <div className="form-group">
               <label className="form-label">Username</label>
               <input
                 type="text"
                 className="form-control"
-                placeholder={role === 'Admin' ? 'e.g. admin' : 'e.g. employee'}
+                placeholder="Enter your username"
                 value={username}
                 onChange={e => setUsername(e.target.value)}
                 disabled={isLoading}

@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useFarm } from '../context/FarmContext';
+import { Modal } from './Modal';
 
 interface SidebarProps {
   activeTab: string;
@@ -9,7 +10,65 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen, setIsOpen }) => {
-  const { currentUser, logout } = useFarm();
+  const { currentUser, logout, updateUserProfile, deleteUser } = useFarm();
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editUsername, setEditUsername] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [profileError, setProfileError] = useState('');
+  const [profileSuccess, setProfileSuccess] = useState('');
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  const handleProfileSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setProfileError('');
+    setProfileSuccess('');
+
+    if (!editUsername.trim()) {
+      setProfileError('Username cannot be empty');
+      return;
+    }
+
+    if (newPassword && newPassword.length < 4) {
+      setProfileError('Password must be at least 4 characters');
+      return;
+    }
+
+    if (newPassword && newPassword !== confirmNewPassword) {
+      setProfileError('Passwords do not match');
+      return;
+    }
+
+    setIsSavingProfile(true);
+    setTimeout(() => {
+      if (currentUser) {
+        const result = updateUserProfile(currentUser.username, editUsername, newPassword || undefined);
+        if (result.success) {
+          setProfileSuccess(result.message);
+          setNewPassword('');
+          setConfirmNewPassword('');
+          setTimeout(() => {
+            setModalOpen(false);
+            setProfileSuccess('');
+          }, 1500);
+        } else {
+          setProfileError(result.message);
+        }
+      }
+      setIsSavingProfile(false);
+    }, 600);
+  };
+
+  const handleDeleteAccount = () => {
+    if (!currentUser) return;
+    const confirmDelete = window.confirm(
+      `WARNING: Are you sure you want to permanently delete your account "${currentUser.username}"? This action cannot be undone and you will be signed out immediately.`
+    );
+    if (confirmDelete) {
+      deleteUser(currentUser.username);
+      logout();
+    }
+  };
 
   const menuItems = [
     {
@@ -115,6 +174,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
         </svg>
       ),
       adminOnly: true
+    },
+    {
+      id: 'employees',
+      label: 'Employees',
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+        </svg>
+      ),
+      adminOnly: true
     }
   ];
 
@@ -161,7 +233,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
         </nav>
 
         <div className="sidebar-footer">
-          <div className="user-profile">
+          <div className="user-profile clickable" onClick={() => { setEditUsername(currentUser?.username || ''); setModalOpen(true); }} title="Edit Profile">
             <div className="user-avatar">
               {currentUser?.username.substring(0, 2).toUpperCase()}
             </div>
@@ -466,8 +538,118 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
             width: 100%;
           }
         }
+
+        /* Clickable Profile & Settings Overlay */
+        .user-profile.clickable {
+          cursor: pointer;
+          border-radius: var(--radius-md);
+          padding: 4px;
+          margin-left: -4px;
+          transition: all var(--transition-fast);
+        }
+
+        .user-profile.clickable:hover {
+          background: rgba(255, 255, 255, 0.05);
+        }
+
+        .user-profile.clickable:hover .user-avatar {
+          filter: brightness(1.1);
+        }
+
+        .user-avatar {
+          position: relative;
+        }
+
+
+        .login-error-alert {
+          background: var(--color-rose-glow);
+          color: var(--color-rose);
+          border: 1px solid rgba(244, 63, 94, 0.15);
+          padding: 0.75rem;
+          border-radius: var(--radius-md);
+          font-size: 0.82rem;
+          font-weight: 500;
+          animation: fadeIn var(--transition-fast) ease-out;
+        }
+
+        .login-success-alert {
+          background: var(--color-emerald-glow);
+          color: var(--color-emerald);
+          border: 1px solid rgba(16, 185, 129, 0.15);
+          padding: 0.75rem;
+          border-radius: var(--radius-md);
+          font-size: 0.82rem;
+          font-weight: 500;
+          animation: fadeIn var(--transition-fast) ease-out;
+        }
       `}</style>
     </aside>
+
+    <Modal isOpen={modalOpen} onClose={() => { setModalOpen(false); setProfileError(''); setProfileSuccess(''); }} title="Edit Profile">
+      <form onSubmit={handleProfileSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', marginTop: 'var(--spacing-md)' }}>
+        {profileError && <div className="login-error-alert" style={{ marginBottom: 0 }}>{profileError}</div>}
+        {profileSuccess && <div className="login-success-alert" style={{ marginBottom: 0 }}>{profileSuccess}</div>}
+        
+        <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <label className="form-label" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Username</label>
+          <input
+            type="text"
+            className="form-control"
+            value={editUsername}
+            onChange={e => setEditUsername(e.target.value)}
+            required
+            disabled={isSavingProfile}
+          />
+        </div>
+        <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <label className="form-label" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Role</label>
+          <input
+            type="text"
+            className="form-control"
+            value={currentUser?.role || ''}
+            disabled
+            style={{ opacity: 0.6 }}
+          />
+        </div>
+        <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <label className="form-label" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-muted)' }}>New Password</label>
+          <input
+            type="password"
+            className="form-control"
+            placeholder="Min 4 characters (leave blank to keep current)"
+            value={newPassword}
+            onChange={e => setNewPassword(e.target.value)}
+            disabled={isSavingProfile}
+          />
+        </div>
+        <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <label className="form-label" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Confirm New Password</label>
+          <input
+            type="password"
+            className="form-control"
+            placeholder="Re-enter password (leave blank to keep current)"
+            value={confirmNewPassword}
+            onChange={e => setConfirmNewPassword(e.target.value)}
+            disabled={isSavingProfile}
+          />
+        </div>
+        <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: 'var(--spacing-sm)', padding: '0.7rem' }} disabled={isSavingProfile}>
+          {isSavingProfile ? <span className="spinner-loader"></span> : 'Update Profile'}
+        </button>
+
+        <div style={{ borderTop: '1px solid var(--border-color)', marginTop: 'var(--spacing-md)', paddingTop: 'var(--spacing-md)' }}>
+          <button 
+            type="button" 
+            className="btn btn-danger" 
+            onClick={handleDeleteAccount}
+            style={{ width: '100%', padding: '0.7rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+            disabled={isSavingProfile}
+          >
+            🗑 Delete Account
+          </button>
+        </div>
+      </form>
+    </Modal>
   </>
   );
 };
