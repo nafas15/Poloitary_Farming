@@ -77,7 +77,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
           <line x1="12" x2="12" y1="2" y2="22" />
           <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
         </svg>
-      )
+      ),
+      adminOnly: true
     },
     {
       id: 'expenses',
@@ -88,7 +89,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
           <circle cx="12" cy="12" r="2" />
           <path d="M6 12h.01M18 12h.01" />
         </svg>
-      )
+      ),
+      adminOnly: true
     },
     {
       id: 'profit-loss',
@@ -111,7 +113,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
           <line x1="16" x2="8" y1="17" y2="17" />
           <line x1="10" x2="8" y1="9" y2="9" />
         </svg>
-      )
+      ),
+      adminOnly: true
     }
   ];
 

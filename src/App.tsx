@@ -56,17 +56,17 @@ function MainAppContent() {
 
   // Render the appropriate tab contents
   const renderTabContent = () => {
+    const isAdmin = currentUser?.role === 'Admin';
     switch (activeTab) {
       case 'dashboard':    return <Dashboard />;
       case 'birds':        return <BirdMgmt />;
       case 'feed':         return <FeedMgmt />;
       case 'health':       return <HealthMgmt />;
       case 'eggs':         return <EggProduction />;
-      case 'sales':        return <SalesMgmt />;
-      case 'expenses':     return <ExpenseMgmt />;
-      case 'profit-loss':
-        return currentUser.role === 'Admin' ? <ProfitLoss /> : <Dashboard />;
-      case 'reports':      return <Reports />;
+      case 'sales':        return isAdmin ? <SalesMgmt /> : <Dashboard />;
+      case 'expenses':     return isAdmin ? <ExpenseMgmt /> : <Dashboard />;
+      case 'profit-loss':  return isAdmin ? <ProfitLoss /> : <Dashboard />;
+      case 'reports':      return isAdmin ? <Reports /> : <Dashboard />;
       default:             return <Dashboard />;
     }
   };
