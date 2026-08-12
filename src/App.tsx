@@ -17,6 +17,7 @@ const ExpenseMgmt  = lazy(() => import('./pages/ExpenseMgmt').then(m => ({ defau
 const ProfitLoss   = lazy(() => import('./pages/ProfitLoss').then(m => ({ default: m.ProfitLoss })));
 const Reports      = lazy(() => import('./pages/Reports').then(m => ({ default: m.Reports })));
 const EmployeeMgmt = lazy(() => import('./pages/EmployeeMgmt').then(m => ({ default: m.EmployeeMgmt })));
+import { InvoiceGenerator } from './pages/InvoiceGenerator';
 
 import './styles/index.css';
 
@@ -65,6 +66,7 @@ function MainAppContent() {
       case 'health':       return <HealthMgmt />;
       case 'eggs':         return <EggProduction />;
       case 'sales':        return isAdmin ? <SalesMgmt /> : <Dashboard />;
+      case 'invoices':     return <InvoiceGenerator />;
       case 'expenses':     return isAdmin ? <ExpenseMgmt /> : <Dashboard />;
       case 'profit-loss':  return isAdmin ? <ProfitLoss /> : <Dashboard />;
       case 'reports':      return isAdmin ? <Reports /> : <Dashboard />;

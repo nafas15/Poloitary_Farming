@@ -163,16 +163,6 @@ export const ExpenseMgmt: React.FC = () => {
                         >
                           ✏️ Edit
                         </button>
-                        <button
-                          className="btn btn-danger btn-xs-custom"
-                          onClick={() => {
-                            if (confirm('Are you sure you want to delete this expense record? Associated purchases/records will be deleted.')) {
-                              deleteExpense(e.id);
-                            }
-                          }}
-                        >
-                          🗑️ Delete
-                        </button>
                       </div>
                     </td>
                   </tr>
@@ -258,10 +248,24 @@ export const ExpenseMgmt: React.FC = () => {
         onClose={() => setIsEditModalOpen(false)}
         title="✏️ Edit Expense Record"
         footer={
-          <>
-            <button className="btn btn-secondary" onClick={() => setIsEditModalOpen(false)}>Cancel</button>
-            <button className="btn btn-primary" onClick={handleEditSubmit}>Save Changes</button>
-          </>
+          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+            <button
+              type="button"
+              className="btn btn-danger"
+              onClick={() => {
+                if (window.confirm('Are you sure you want to delete this expense record? Associated purchases/records will be deleted.')) {
+                  deleteExpense(editingExpenseId);
+                  setIsEditModalOpen(false);
+                }
+              }}
+            >
+              🗑️ Delete Expense
+            </button>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button type="button" className="btn btn-secondary" onClick={() => setIsEditModalOpen(false)}>Cancel</button>
+              <button type="button" className="btn btn-primary" onClick={handleEditSubmit}>Save Changes</button>
+            </div>
+          </div>
         }
       >
         <form onSubmit={handleEditSubmit} className="modal-form-grid">

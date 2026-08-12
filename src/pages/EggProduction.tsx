@@ -228,23 +228,6 @@ export const EggProduction: React.FC = () => {
                           >
                             ✏️ Edit
                           </button>
-                          <button
-                            className="btn btn-danger"
-                            onClick={() => {
-                              if (confirm(`Delete egg collection record for ${c.date}?`)) {
-                                deleteEggCollection(c.date);
-                              }
-                            }}
-                            style={{
-                              padding: '0.25rem 0.5rem',
-                              fontSize: '0.75rem',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.25rem'
-                            }}
-                          >
-                            🗑️ Delete
-                          </button>
                         </div>
                       </td>
                     </tr>
@@ -313,10 +296,24 @@ export const EggProduction: React.FC = () => {
         onClose={() => setIsEditCollectModalOpen(false)}
         title="✏️ Edit Egg Collection"
         footer={
-          <>
-            <button className="btn btn-secondary" onClick={() => setIsEditCollectModalOpen(false)}>Cancel</button>
-            <button className="btn btn-primary" onClick={handleEditCollectSubmit}>Save Changes</button>
-          </>
+          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+            <button
+              type="button"
+              className="btn btn-danger"
+              onClick={() => {
+                if (window.confirm(`Delete egg collection record for ${editingCollectionOriginalDate}?`)) {
+                  deleteEggCollection(editingCollectionOriginalDate);
+                  setIsEditCollectModalOpen(false);
+                }
+              }}
+            >
+              🗑️ Delete Record
+            </button>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button type="button" className="btn btn-secondary" onClick={() => setIsEditCollectModalOpen(false)}>Cancel</button>
+              <button type="button" className="btn btn-primary" onClick={handleEditCollectSubmit}>Save Changes</button>
+            </div>
+          </div>
         }
       >
         <form onSubmit={handleEditCollectSubmit} className="modal-form-grid">

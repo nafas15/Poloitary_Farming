@@ -3,19 +3,38 @@ import { useFarm } from '../context/FarmContext';
 import type { UserRole } from '../context/FarmContext';
 
 export const Login: React.FC = () => {
-  const { login, usersList, registerUser } = useFarm();
-  const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login');
+  const { login, usersList, registerUser, verifyAndResetPassword } = useFarm();
+  const [mode, setMode] = useState<'login' | 'signup' | 'forgot' | 'reset'>('login');
   
-  // Form fields
+  // Login & Signup Form fields
+  const [fullName, setFullName] = useState('');
+  const [dob, setDob] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [role, setRole] = useState<UserRole>('Admin');
   
+  // Security Question fields for Signup & Reset
+  const [securityQuestion, setSecurityQuestion] = useState('What is the name of your farm?');
+  const [securityAnswer, setSecurityAnswer] = useState('');
+  
+  // Password Reset state
+  const [resetUsername, setResetUsername] = useState('');
+  const [resetDob, setResetDob] = useState('');
+  const [activeQuestion, setActiveQuestion] = useState('');
+  const [userAnswerInput, setUserAnswerInput] = useState('');
+
   // Notification states
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  const securityQuestionOptions = [
+    'What is the name of your farm?',
+    'What is your birthplace / hometown?',
+    'What was your first pet’s name?',
+    'What is your emergency contact phone number?'
+  ];
 
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,9 +48,7 @@ export const Login: React.FC = () => {
 
     setIsLoading(true);
 
-    // Simulate short network delay for premium experience
     setTimeout(() => {
-      // Match case-insensitively for username and check password exactly
       const matchedUser = usersList.find(
         u => u.username.toLowerCase() === username.trim().toLowerCase()
       );
@@ -49,7 +66,7 @@ export const Login: React.FC = () => {
         setError('Invalid username or password.');
       }
       setIsLoading(false);
-    }, 800);
+    }, 600);
   };
 
   const handleSignupSubmit = (e: React.FormEvent) => {
@@ -58,8 +75,12 @@ export const Login: React.FC = () => {
     setSuccessMsg('');
 
     const trimmedUser = username.trim();
-    if (!trimmedUser || !password || !confirmPassword) {
-      setError('Please fill in all fields');
+    const trimmedName = fullName.trim();
+    const trimmedDob = dob.trim();
+    const trimmedAnswer = securityAnswer.trim();
+
+    if (!trimmedUser || !trimmedName || !trimmedDob || !password || !confirmPassword || !trimmedAnswer) {
+      setError('Please fill in all employee details (Full Name, Date of Birth, Credentials, and Security Answer).');
       return;
     }
 
@@ -80,7 +101,11 @@ export const Login: React.FC = () => {
         username: trimmedUser,
         password,
         role,
-        approved: false // will default to false, requiring approval
+        approved: false,
+        fullName: trimmedName,
+        dob: trimmedDob,
+        securityQuestion,
+        securityAnswer: trimmedAnswer
       });
 
       if (result.success) {
@@ -88,19 +113,22 @@ export const Login: React.FC = () => {
         setMode('login');
         setPassword('');
         setConfirmPassword('');
+        setFullName('');
+        setDob('');
+        setSecurityAnswer('');
       } else {
         setError(result.message);
       }
       setIsLoading(false);
-    }, 800);
+    }, 600);
   };
 
-  const handleForgotSubmit = (e: React.FormEvent) => {
+  const handleVerifyAccountSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setSuccessMsg('');
 
-    const trimmedUser = username.trim();
+    const trimmedUser = resetUsername.trim();
     if (!trimmedUser) {
       setError('Please enter your username');
       return;
@@ -109,26 +137,71 @@ export const Login: React.FC = () => {
     setIsLoading(true);
 
     setTimeout(() => {
-      // Look for user matching this username
       const matchedUser = usersList.find(
         u => u.username.toLowerCase() === trimmedUser.toLowerCase()
       );
 
       if (matchedUser) {
-        setSuccessMsg(`Account verified! Password reset instructions simulated. (Dev mode: Password is "${matchedUser.password}")`);
+        setActiveQuestion(matchedUser.securityQuestion || 'What is the name of your farm?');
+        setSuccessMsg(`Account verified for "${matchedUser.username}". Enter your DOB and security answer to reset your password.`);
+        setMode('reset');
+        setPassword('');
+        setConfirmPassword('');
+        setResetDob('');
+        setUserAnswerInput('');
       } else {
         setError(`No account found with username "${trimmedUser}".`);
       }
       setIsLoading(false);
-    }, 800);
+    }, 600);
   };
 
-  const switchMode = (newMode: 'login' | 'signup' | 'forgot') => {
+  const handleResetWithAnswerSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setSuccessMsg('');
+
+    if (!resetDob.trim() || !userAnswerInput.trim() || !password || !confirmPassword) {
+      setError('Please fill in all verification fields (DOB, Security Answer, and New Password).');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+
+    if (password.length < 4) {
+      setError('Password must be at least 4 characters long.');
+      return;
+    }
+
+    setIsLoading(true);
+
+    setTimeout(() => {
+      const result = verifyAndResetPassword(resetUsername, resetDob, userAnswerInput, password);
+      if (result.success) {
+        setSuccessMsg(result.message);
+        switchMode('login');
+      } else {
+        setError(result.message);
+      }
+      setIsLoading(false);
+    }, 600);
+  };
+
+  const switchMode = (newMode: 'login' | 'signup' | 'forgot' | 'reset') => {
     setError('');
     setSuccessMsg('');
     setUsername('');
     setPassword('');
     setConfirmPassword('');
+    setFullName('');
+    setDob('');
+    setSecurityAnswer('');
+    setUserAnswerInput('');
+    setResetUsername('');
+    setResetDob('');
     setMode(newMode);
   };
 
@@ -173,7 +246,7 @@ export const Login: React.FC = () => {
                 <button
                   type="button"
                   className="link-btn"
-                  style={{ fontSize: '0.75rem', color: 'var(--color-indigo)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                  style={{ fontSize: '0.75rem', color: '#059669', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 600 }}
                   onClick={() => switchMode('forgot')}
                   disabled={isLoading}
                 >
@@ -238,6 +311,32 @@ export const Login: React.FC = () => {
             </div>
 
             <div className="form-group">
+              <label className="form-label">Full Name / Employee Name</label>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="e.g. Rahul Sharma"
+                value={fullName}
+                onChange={e => setFullName(e.target.value)}
+                disabled={isLoading}
+                maxLength={100}
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Date of Birth (DOB)</label>
+              <input
+                type="date"
+                className="form-control"
+                value={dob}
+                onChange={e => setDob(e.target.value)}
+                disabled={isLoading}
+                required
+              />
+            </div>
+
+            <div className="form-group">
               <label className="form-label">Username</label>
               <input
                 type="text"
@@ -279,6 +378,34 @@ export const Login: React.FC = () => {
               />
             </div>
 
+            <div className="form-group">
+              <label className="form-label">Security Question (For Password Reset)</label>
+              <select
+                className="form-control"
+                value={securityQuestion}
+                onChange={e => setSecurityQuestion(e.target.value)}
+                disabled={isLoading}
+              >
+                {securityQuestionOptions.map(q => (
+                  <option key={q} value={q}>{q}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Security Answer</label>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="Enter your secret answer"
+                value={securityAnswer}
+                onChange={e => setSecurityAnswer(e.target.value)}
+                disabled={isLoading}
+                maxLength={100}
+                required
+              />
+            </div>
+
             <button type="submit" className="btn btn-primary login-submit-btn" disabled={isLoading}>
               {isLoading ? (
                 <span className="spinner-loader"></span>
@@ -302,9 +429,9 @@ export const Login: React.FC = () => {
         )}
 
         {mode === 'forgot' && (
-          <form onSubmit={handleForgotSubmit} className="login-form">
+          <form onSubmit={handleVerifyAccountSubmit} className="login-form">
             <h3 className="form-section-title">Reset Password</h3>
-            <p className="form-section-desc">Enter your username and we will verify the account details.</p>
+            <p className="form-section-desc">Enter your username to begin identity verification.</p>
 
             <div className="form-group">
               <label className="form-label">Username</label>
@@ -312,8 +439,8 @@ export const Login: React.FC = () => {
                 type="text"
                 className="form-control"
                 placeholder="Enter registered username"
-                value={username}
-                onChange={e => setUsername(e.target.value)}
+                value={resetUsername}
+                onChange={e => setResetUsername(e.target.value)}
                 disabled={isLoading}
                 maxLength={64}
                 required
@@ -324,7 +451,7 @@ export const Login: React.FC = () => {
               {isLoading ? (
                 <span className="spinner-loader"></span>
               ) : (
-                'Verify Account'
+                'Find Account'
               )}
             </button>
 
@@ -335,7 +462,94 @@ export const Login: React.FC = () => {
                 onClick={() => switchMode('login')}
                 disabled={isLoading}
               >
-                ← Back to Sign In
+                ← Return to Sign In
+              </button>
+            </div>
+          </form>
+        )}
+
+        {mode === 'reset' && (
+          <form onSubmit={handleResetWithAnswerSubmit} className="login-form">
+            <h3 className="form-section-title">Identity & Security Verification</h3>
+            <p className="form-section-desc">Account: <strong>{resetUsername}</strong></p>
+
+            <div className="form-group">
+              <label className="form-label">Date of Birth (DOB)</label>
+              <input
+                type="date"
+                className="form-control"
+                value={resetDob}
+                onChange={e => setResetDob(e.target.value)}
+                disabled={isLoading}
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Security Question</label>
+              <div style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', padding: '0.75rem 1rem', borderRadius: '10px', fontSize: '0.9rem', color: '#0f172a', fontWeight: 600 }}>
+                ❓ {activeQuestion}
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Security Answer</label>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="Enter your security answer"
+                value={userAnswerInput}
+                onChange={e => setUserAnswerInput(e.target.value)}
+                disabled={isLoading}
+                maxLength={100}
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">New Password</label>
+              <input
+                type="password"
+                className="form-control"
+                placeholder="Min 4 characters"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                disabled={isLoading}
+                maxLength={64}
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Confirm New Password</label>
+              <input
+                type="password"
+                className="form-control"
+                placeholder="Re-enter new password"
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+                disabled={isLoading}
+                maxLength={64}
+                required
+              />
+            </div>
+
+            <button type="submit" className="btn btn-primary login-submit-btn" disabled={isLoading}>
+              {isLoading ? (
+                <span className="spinner-loader"></span>
+              ) : (
+                'Verify & Reset Password'
+              )}
+            </button>
+
+            <div className="auth-footer-links">
+              <button
+                type="button"
+                className="text-link"
+                onClick={() => switchMode('login')}
+                disabled={isLoading}
+              >
+                ← Return to Sign In
               </button>
             </div>
           </form>

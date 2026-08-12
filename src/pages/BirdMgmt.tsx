@@ -4,16 +4,27 @@ import type { BirdType } from '../context/FarmContext';
 import { Modal } from '../components/Modal';
 
 export const BirdMgmt: React.FC = () => {
-  const { batches, addBatch, logMortality, deleteBatch, sellBatch, sales, updateBatch } = useFarm();
+  const { 
+    batches, 
+    addBatch, 
+    logMortality, 
+    updateMortalityLog,
+    deleteMortalityLog,
+    deleteBatch, 
+    sellBatch, 
+    sales, 
+    updateBatch 
+  } = useFarm();
   
-  // Tab Filter
-  const [filter, setFilter] = useState<'Broiler' | 'Layer'>('Broiler');
+  // Tab Filter ('All' | 'Broiler' | 'Layer' | 'Archived' | 'MortalityAudit')
+  const [filter, setFilter] = useState<'All' | 'Broiler' | 'Layer' | 'Archived' | 'MortalityAudit'>('All');
   
   // Modals Open State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isSellModalOpen, setIsSellModalOpen] = useState(false);
   const [isMortalityModalOpen, setIsMortalityModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isEditMortalityModalOpen, setIsEditMortalityModalOpen] = useState(false);
   const [selectedBatchId, setSelectedBatchId] = useState<string>('');
 
   // Form Fields - Add Batch
@@ -33,6 +44,14 @@ export const BirdMgmt: React.FC = () => {
   const [editPrice, setEditPrice] = useState<number>(0);
   const [editQtyKg, setEditQtyKg] = useState<number>(0);
   const [editPricePerKg, setEditPricePerKg] = useState<number>(0);
+
+  // Form Fields - Edit Mortality Audit
+  const [editMortalityId, setEditMortalityId] = useState('');
+  const [editMortalityBatchId, setEditMortalityBatchId] = useState('');
+  const [editMortalityOldQty, setEditMortalityOldQty] = useState<number>(0);
+  const [editMortalityNewQty, setEditMortalityNewQty] = useState<number>(0);
+  const [editMortalityReason, setEditMortalityReason] = useState('');
+  const [editMortalityDate, setEditMortalityDate] = useState('');
 
   const handleOpenEdit = (batch: any) => {
     setEditingBatchId(batch.id);
@@ -70,6 +89,36 @@ export const BirdMgmt: React.FC = () => {
       purchasePricePerKg: editType === 'Broiler' ? Number(editPricePerKg) : undefined
     });
     setIsEditModalOpen(false);
+  };
+
+  const handleOpenEditMortality = (log: any, batchId: string) => {
+    setEditMortalityId(log.id);
+    setEditMortalityBatchId(batchId);
+    setEditMortalityOldQty(log.quantity);
+    setEditMortalityNewQty(log.quantity);
+    setEditMortalityReason(log.reason);
+    setEditMortalityDate(log.date);
+    setIsEditMortalityModalOpen(true);
+  };
+
+  const handleEditMortalitySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editMortalityId || !editMortalityBatchId) return;
+    await updateMortalityLog(
+      editMortalityId,
+      editMortalityBatchId,
+      editMortalityOldQty,
+      Number(editMortalityNewQty),
+      editMortalityReason,
+      editMortalityDate
+    );
+    setIsEditMortalityModalOpen(false);
+  };
+
+  const handleDeleteMortality = async (id: string, batchId: string, qty: number) => {
+    if (window.confirm(`Are you sure you want to delete this mortality record (${qty} birds)? This will restore ${qty} birds back to Batch ${batchId}.`)) {
+      await deleteMortalityLog(id, batchId, qty);
+    }
   };
 
   // Form Fields - Sell Batch
@@ -197,27 +246,74 @@ export const BirdMgmt: React.FC = () => {
   }, [sales, sellCustomer]);
 
   const activeBatches = batches.filter(b => b.status === 'Active' && b.currentQuantity > 0);
+  const archivedBatches = batches.filter(b => b.status === 'Sold' || b.currentQuantity === 0);
   const selectedSellBatch = activeBatches.find(b => b.id === sellBatchId);
 
-  const filteredBatches = batches.filter(b => b.status === 'Active' && b.type === (filter as any));
+  // Active Filtered Batches
+  const activeDisplayBatches = filter === 'All'
+    ? activeBatches
+    : batches.filter(b => b.status === 'Active' && b.type === (filter as any));
 
+  // Flattened Mortality Audit Records across all batches
+  const allMortalityAuditLogs = React.useMemo(() => {
+    const logsList: Array<{
+      id: string;
+      batchId: string;
+      batchType: BirdType;
+      date: string;
+      quantity: number;
+      reason: string;
+    }> = [];
 
+    batches.forEach(b => {
+      (b.mortalityLogs || []).forEach(m => {
+        logsList.push({
+          id: m.id,
+          batchId: b.id,
+          batchType: b.type,
+          date: m.date,
+          quantity: m.quantity,
+          reason: m.reason
+        });
+      });
+    });
+
+    return logsList.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [batches]);
 
   return (
     <div className="bird-mgmt-page animate-fade-in">
-        <div className="page-header-actions">
+      <div className="page-header-actions">
         <div className="filter-tabs">
+          <button
+            className={`tab-btn ${filter === 'All' ? 'active' : ''}`}
+            onClick={() => setFilter('All')}
+          >
+            📋 All Batches ({activeBatches.length})
+          </button>
           <button
             className={`tab-btn ${filter === 'Broiler' ? 'active' : ''}`}
             onClick={() => setFilter('Broiler')}
           >
-            🥩 Broiler Batches
+            🥩 Broiler Batches ({batches.filter(b => b.status === 'Active' && b.type === 'Broiler').length})
           </button>
           <button
             className={`tab-btn ${filter === 'Layer' ? 'active' : ''}`}
             onClick={() => setFilter('Layer')}
           >
-            🥚 Layer Batches
+            🥚 Layer Batches ({batches.filter(b => b.status === 'Active' && b.type === 'Layer').length})
+          </button>
+          <button
+            className={`tab-btn ${filter === 'Archived' ? 'active' : ''}`}
+            onClick={() => setFilter('Archived')}
+          >
+            📦 Archived / Sold ({archivedBatches.length})
+          </button>
+          <button
+            className={`tab-btn ${filter === 'MortalityAudit' ? 'active' : ''}`}
+            onClick={() => setFilter('MortalityAudit')}
+          >
+            💀 Mortality Audit ({allMortalityAuditLogs.length})
           </button>
         </div>
 
@@ -242,21 +338,21 @@ export const BirdMgmt: React.FC = () => {
           <button
             className="btn btn-primary"
             onClick={() => {
-              setNewType(filter);
+              setNewType(filter === 'Layer' ? 'Layer' : 'Broiler');
               setIsAddModalOpen(true);
             }}
           >
-            ➕ Add {filter === 'Broiler' ? 'Broiler' : 'Layer'} Batch
+            ➕ Add Bird Batch
           </button>
         </div>
       </div>
 
-      {/* ── Broiler Batches Table ── */}
-      {filter === 'Broiler' && (
+      {/* ── All Batches / Broiler / Layer Tables ── */}
+      {(filter === 'All' || filter === 'Broiler' || filter === 'Layer') && (
         <div className="glass-card table-section">
-          {filteredBatches.length === 0 ? (
+          {activeDisplayBatches.length === 0 ? (
             <div className="empty-state">
-              <p>No active broiler batches found. Click "Add Broiler Batch" to register one.</p>
+              <p>No active bird batches found for "{filter}". Click "Add Bird Batch" to register a new flock.</p>
             </div>
           ) : (
             <div className="table-wrapper">
@@ -264,30 +360,38 @@ export const BirdMgmt: React.FC = () => {
                 <thead>
                   <tr>
                     <th>Batch ID</th>
+                    <th>Type</th>
                     <th>Arrival Date</th>
                     <th>Age (Days)</th>
                     <th>Initial Birds</th>
-                    <th>Quantity (Kg)</th>
-                    <th>Price per Kg (Rs)</th>
+                    <th>Weight / Price</th>
                     <th>Sold Birds</th>
                     <th>Mortality</th>
                     <th>Current Qty</th>
-                    <th>Avg Cost/Bird</th>
+                    <th>Cost/Bird</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredBatches.map(batch => {
+                  {activeDisplayBatches.map(batch => {
                     const totalDead = batch.mortalityLogs.reduce((sum, m) => sum + m.quantity, 0);
                     const totalSold = sales.filter(s => s.type === 'Bird' && s.batchId === batch.id).reduce((sum, s) => sum + s.quantity, 0);
                     return (
                       <tr key={batch.id}>
                         <td><span className="batch-badge">{batch.id}</span></td>
+                        <td>
+                          <span className={`role-badge ${batch.type === 'Broiler' ? 'admin' : 'employee'}`}>
+                            {batch.type === 'Broiler' ? '🥩 Broiler' : '🥚 Layer'}
+                          </span>
+                        </td>
                         <td>{batch.arrivalDate}</td>
                         <td><b>{calculateAgeDays(batch.arrivalDate)} days</b></td>
                         <td>{batch.initialQuantity.toLocaleString()}</td>
-                        <td>{batch.initialQuantityKg ? `${batch.initialQuantityKg.toLocaleString()} kg` : '-'}</td>
-                        <td>{batch.purchasePricePerKg ? `Rs ${batch.purchasePricePerKg.toFixed(2)}` : '-'}</td>
+                        <td>
+                          {batch.type === 'Broiler' && batch.initialQuantityKg 
+                            ? `${batch.initialQuantityKg.toLocaleString()} kg @ Rs ${batch.purchasePricePerKg?.toFixed(2)}/kg`
+                            : `Rs ${batch.purchasePrice.toFixed(2)} / bird`}
+                        </td>
                         <td><strong>{totalSold > 0 ? `${totalSold.toLocaleString()} birds` : '0'}</strong></td>
                         <td>{totalDead > 0 ? `💀 ${totalDead}` : '0'}</td>
                         <td><span className="current-qty-active">🐔 {batch.currentQuantity.toLocaleString()}</span></td>
@@ -339,12 +443,19 @@ export const BirdMgmt: React.FC = () => {
         </div>
       )}
 
-      {/* ── Layer Batches Table ── */}
-      {filter === 'Layer' && (
+      {/* ── Archived / Sold Batches View ── */}
+      {filter === 'Archived' && (
         <div className="glass-card table-section">
-          {filteredBatches.length === 0 ? (
+          <div className="section-header" style={{ marginBottom: '1rem' }}>
+            <div>
+              <h4>📦 Archived / Completed Batches</h4>
+              <p className="subtitle">Historical record of sold and fully cleared bird flocks</p>
+            </div>
+          </div>
+
+          {archivedBatches.length === 0 ? (
             <div className="empty-state">
-              <p>No active layer batches found. Click "Add Layer Batch" to register one.</p>
+              <p>No archived or fully sold batches recorded yet.</p>
             </div>
           ) : (
             <div className="table-wrapper">
@@ -352,64 +463,53 @@ export const BirdMgmt: React.FC = () => {
                 <thead>
                   <tr>
                     <th>Batch ID</th>
+                    <th>Type</th>
                     <th>Arrival Date</th>
-                    <th>Age (Days)</th>
                     <th>Initial Birds</th>
-                    <th>Cost per Bird</th>
-                    <th>Sold Birds</th>
-                    <th>Mortality</th>
-                    <th>Current Qty</th>
+                    <th>Mortality Lost</th>
+                    <th>Total Sold</th>
+                    <th>Status</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredBatches.map(batch => {
+                  {archivedBatches.map(batch => {
                     const totalDead = batch.mortalityLogs.reduce((sum, m) => sum + m.quantity, 0);
                     const totalSold = sales.filter(s => s.type === 'Bird' && s.batchId === batch.id).reduce((sum, s) => sum + s.quantity, 0);
                     return (
                       <tr key={batch.id}>
                         <td><span className="batch-badge">{batch.id}</span></td>
+                        <td>
+                          <span className={`role-badge ${batch.type === 'Broiler' ? 'admin' : 'employee'}`}>
+                            {batch.type === 'Broiler' ? '🥩 Broiler' : '🥚 Layer'}
+                          </span>
+                        </td>
                         <td>{batch.arrivalDate}</td>
-                        <td><b>{calculateAgeDays(batch.arrivalDate)} days</b></td>
                         <td>{batch.initialQuantity.toLocaleString()}</td>
-                        <td>Rs {batch.purchasePrice.toFixed(2)}</td>
-                        <td><strong>{totalSold > 0 ? `${totalSold.toLocaleString()} birds` : '0'}</strong></td>
-                        <td>{totalDead > 0 ? `💀 ${totalDead}` : '0'}</td>
-                        <td><span className="current-qty-active">🐔 {batch.currentQuantity.toLocaleString()}</span></td>
+                        <td><span className="color-rose">💀 {totalDead}</span></td>
+                        <td><strong>{totalSold.toLocaleString()} birds</strong></td>
+                        <td>
+                          <span className="status-dot pending" style={{ background: '#64748b' }}></span> Sold Out / Archived
+                        </td>
                         <td>
                           <div className="batch-action-group">
                             <button
                               className="btn btn-secondary btn-sm-custom"
-                              onClick={() => {
-                                setSelectedBatchId(batch.id);
-                                setIsMortalityModalOpen(true);
-                              }}
-                            >
-                              ☠️ Death
-                            </button>
-                            <button
-                              className="btn btn-secondary btn-sm-custom"
-                              style={{ color: 'var(--color-emerald)', borderColor: 'rgba(16, 185, 129, 0.3)' }}
-                              onClick={() => {
-                                setSellBatchId(batch.id);
-                                setSellQty(100);
-                                setSellUnitPrice(0);
-                                setSellWeightKg(0);
-                                setSellPricePerKg(0);
-                                setSellCustomer('');
-                                setSellContact('');
-                                setSellTransport(0);
-                                setSellOther(0);
-                                setIsSellModalOpen(true);
-                              }}
-                            >
-                              💰 Sell
-                            </button>
-                            <button
-                              className="btn btn-secondary btn-sm-custom"
                               onClick={() => handleOpenEdit(batch)}
+                              title="Edit Archived Batch Details"
                             >
                               ✏️ Edit
+                            </button>
+                            <button
+                              className="btn btn-danger btn-sm-custom"
+                              onClick={() => {
+                                if (confirm(`Permanently delete Archived Batch ${batch.id}?`)) {
+                                  deleteBatch(batch.id);
+                                }
+                              }}
+                              title="Delete Archived Batch"
+                            >
+                              🗑️ Delete
                             </button>
                           </div>
                         </td>
@@ -423,8 +523,75 @@ export const BirdMgmt: React.FC = () => {
         </div>
       )}
 
+      {/* ── Mortality Audit Records Table View ── */}
+      {filter === 'MortalityAudit' && (
+        <div className="glass-card table-section">
+          <div className="section-header" style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h4>💀 Mortality Audit Log Records</h4>
+              <p className="subtitle">Audit log of all reported mortality and death records across batches</p>
+            </div>
+            <button
+              className="btn btn-secondary"
+              onClick={() => {
+                setSelectedBatchId('');
+                setIsMortalityModalOpen(true);
+              }}
+            >
+              ➕ Log New Death Record
+            </button>
+          </div>
 
-
+          {allMortalityAuditLogs.length === 0 ? (
+            <div className="empty-state">
+              <p>No bird mortality records logged yet.</p>
+            </div>
+          ) : (
+            <div className="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date of Event</th>
+                    <th>Batch ID</th>
+                    <th>Bird Type</th>
+                    <th>Quantity Lost (Birds)</th>
+                    <th>Reason / Diagnosis</th>
+                    <th style={{ textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allMortalityAuditLogs.map(log => (
+                    <tr key={log.id}>
+                      <td><strong>{log.date}</strong></td>
+                      <td><span className="batch-badge">{log.batchId}</span></td>
+                      <td>
+                        <span className={`role-badge ${log.batchType === 'Broiler' ? 'admin' : 'employee'}`}>
+                          {log.batchType === 'Broiler' ? 'Broiler' : 'Layer'}
+                        </span>
+                      </td>
+                      <td>
+                        <span className="color-rose" style={{ fontWeight: 700 }}>💀 {log.quantity.toLocaleString()} birds</span>
+                      </td>
+                      <td>{log.reason}</td>
+                      <td style={{ textAlign: 'right' }}>
+                        <div className="batch-action-group" style={{ justifyContent: 'flex-end' }}>
+                          <button
+                            className="btn btn-secondary btn-sm-custom"
+                            onClick={() => handleOpenEditMortality(log, log.batchId)}
+                            title="Edit Mortality Record"
+                          >
+                            ✏️ Edit
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 1. Modal Add Batch */}
       <Modal
@@ -1020,6 +1187,80 @@ export const BirdMgmt: React.FC = () => {
               rows={3}
               value={mortalityReason}
               onChange={e => setMortalityReason(e.target.value)}
+              maxLength={500}
+              required
+              style={{ resize: 'vertical' }}
+            ></textarea>
+          </div>
+        </form>
+      </Modal>
+
+      {/* 4. Modal - Edit Mortality Audit Record */}
+      <Modal
+        isOpen={isEditMortalityModalOpen}
+        onClose={() => setIsEditMortalityModalOpen(false)}
+        title={`Edit Mortality Audit Record: Batch ${editMortalityBatchId}`}
+        footer={
+          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+            <button
+              type="button"
+              className="btn btn-danger"
+              onClick={() => {
+                handleDeleteMortality(editMortalityId, editMortalityBatchId, editMortalityOldQty);
+                setIsEditMortalityModalOpen(false);
+              }}
+            >
+              🗑️ Delete Record
+            </button>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button type="button" className="btn btn-secondary" onClick={() => setIsEditMortalityModalOpen(false)}>Cancel</button>
+              <button type="button" className="btn btn-primary" onClick={handleEditMortalitySubmit}>Save Record Changes</button>
+            </div>
+          </div>
+        }
+      >
+        <form onSubmit={handleEditMortalitySubmit}>
+          <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+            <label className="form-label">Batch Reference</label>
+            <input
+              type="text"
+              className="form-control"
+              value={editMortalityBatchId}
+              disabled
+            />
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Date of Event</label>
+              <input
+                type="date"
+                className="form-control"
+                value={editMortalityDate}
+                onChange={e => setEditMortalityDate(e.target.value)}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Quantity Lost (Birds)</label>
+              <input
+                type="number"
+                min="1"
+                className="form-control"
+                value={editMortalityNewQty}
+                onChange={e => setEditMortalityNewQty(Number(e.target.value))}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Reason / Diagnosis</label>
+            <textarea
+              className="form-control"
+              rows={3}
+              value={editMortalityReason}
+              onChange={e => setEditMortalityReason(e.target.value)}
               maxLength={500}
               required
               style={{ resize: 'vertical' }}

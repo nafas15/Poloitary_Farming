@@ -3,7 +3,20 @@ import { useFarm } from '../context/FarmContext';
 import { Modal } from '../components/Modal';
 
 export const HealthMgmt: React.FC = () => {
-  const { batches, vaccines, medicalRecords, addVaccineSchedule, updateVaccineStatus, addMedicalRecord, deleteVaccineSchedule, updateVaccineSchedule, updateMedicalRecord } = useFarm();
+  const { 
+    batches, 
+    vaccines, 
+    medicalRecords, 
+    addVaccineSchedule, 
+    updateVaccineStatus, 
+    addMedicalRecord, 
+    deleteVaccineSchedule, 
+    updateVaccineSchedule, 
+    updateMedicalRecord,
+    deleteMedicalRecord,
+    updateMortalityLog,
+    deleteMortalityLog
+  } = useFarm();
 
   const [subTab, setSubTab] = useState<'vaccines' | 'medical' | 'mortality'>('vaccines');
   const [isVaccineModalOpen, setIsVaccineModalOpen] = useState(false);
@@ -71,6 +84,39 @@ export const HealthMgmt: React.FC = () => {
       cost: Number(editMedicalCost)
     });
     setIsEditMedicalModalOpen(false);
+  };
+
+  // Edit Mortality Record States
+  const [isEditMortalityModalOpen, setIsEditMortalityModalOpen] = useState(false);
+  const [editMortalityId, setEditMortalityId] = useState('');
+  const [editMortalityBatchId, setEditMortalityBatchId] = useState('');
+  const [editMortalityOldQty, setEditMortalityOldQty] = useState<number>(0);
+  const [editMortalityNewQty, setEditMortalityNewQty] = useState<number>(0);
+  const [editMortalityReason, setEditMortalityReason] = useState('');
+  const [editMortalityDate, setEditMortalityDate] = useState('');
+
+  const handleOpenEditMortality = (log: any) => {
+    setEditMortalityId(log.id);
+    setEditMortalityBatchId(log.batchId);
+    setEditMortalityOldQty(log.quantity);
+    setEditMortalityNewQty(log.quantity);
+    setEditMortalityReason(log.reason);
+    setEditMortalityDate(log.date);
+    setIsEditMortalityModalOpen(true);
+  };
+
+  const handleEditMortalitySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editMortalityId || !editMortalityBatchId) return;
+    await updateMortalityLog(
+      editMortalityId,
+      editMortalityBatchId,
+      editMortalityOldQty,
+      Number(editMortalityNewQty),
+      editMortalityReason,
+      editMortalityDate
+    );
+    setIsEditMortalityModalOpen(false);
   };
 
   const [vaccineName, setVaccineName] = useState('Newcastle Disease');
@@ -236,16 +282,6 @@ export const HealthMgmt: React.FC = () => {
                             onClick={() => handleOpenEditVaccine(v)}
                           >
                             ✏️ Edit
-                          </button>
-                          <button
-                            className="btn btn-danger btn-xs-custom"
-                            onClick={() => {
-                              if (window.confirm(`Are you sure you want to delete the vaccine schedule for "${v.vaccineName}"?`)) {
-                                deleteVaccineSchedule(v.id);
-                              }
-                            }}
-                          >
-                            🗑️ Delete
                           </button>
                         </div>
                       </td>
@@ -432,6 +468,7 @@ export const HealthMgmt: React.FC = () => {
                         <th>Log Date</th>
                         <th>Quantity</th>
                         <th>Reason</th>
+                        <th style={{ textAlign: 'right' }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -444,6 +481,15 @@ export const HealthMgmt: React.FC = () => {
                             <td>{log.date}</td>
                             <td><span className="cost-highlight">💀 {log.quantity} birds</span></td>
                             <td>{log.reason}</td>
+                            <td style={{ textAlign: 'right' }}>
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-xs-custom"
+                                onClick={() => handleOpenEditMortality(log)}
+                              >
+                                ✏️ Edit
+                              </button>
+                            </td>
                           </tr>
                         ))}
                     </tbody>
@@ -594,10 +640,24 @@ export const HealthMgmt: React.FC = () => {
         onClose={() => setIsEditVaccineModalOpen(false)}
         title="✏️ Edit Vaccine Event"
         footer={
-          <>
-            <button className="btn btn-secondary" onClick={() => setIsEditVaccineModalOpen(false)}>Cancel</button>
-            <button className="btn btn-primary" onClick={handleEditVaccineSubmit}>Save Changes</button>
-          </>
+          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+            <button
+              type="button"
+              className="btn btn-danger"
+              onClick={() => {
+                if (window.confirm(`Are you sure you want to delete the vaccine schedule for "${editVaccineName}"?`)) {
+                  deleteVaccineSchedule(editingVaccineId);
+                  setIsEditVaccineModalOpen(false);
+                }
+              }}
+            >
+              🗑️ Delete Schedule
+            </button>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button type="button" className="btn btn-secondary" onClick={() => setIsEditVaccineModalOpen(false)}>Cancel</button>
+              <button type="button" className="btn btn-primary" onClick={handleEditVaccineSubmit}>Save Changes</button>
+            </div>
+          </div>
         }
       >
         <form onSubmit={handleEditVaccineSubmit} className="hm-modal-form">
@@ -644,10 +704,24 @@ export const HealthMgmt: React.FC = () => {
         onClose={() => setIsEditMedicalModalOpen(false)}
         title="✏️ Edit Medical Record & Remedy"
         footer={
-          <>
-            <button className="btn btn-secondary" onClick={() => setIsEditMedicalModalOpen(false)}>Cancel</button>
-            <button className="btn btn-primary" onClick={handleEditMedicalSubmit}>Save Changes</button>
-          </>
+          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+            <button
+              type="button"
+              className="btn btn-danger"
+              onClick={() => {
+                if (window.confirm('Are you sure you want to delete this medical record?')) {
+                  deleteMedicalRecord(editingMedicalId);
+                  setIsEditMedicalModalOpen(false);
+                }
+              }}
+            >
+              🗑️ Delete Record
+            </button>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button type="button" className="btn btn-secondary" onClick={() => setIsEditMedicalModalOpen(false)}>Cancel</button>
+              <button type="button" className="btn btn-primary" onClick={handleEditMedicalSubmit}>Save Changes</button>
+            </div>
+          </div>
         }
       >
         <form onSubmit={handleEditMedicalSubmit} className="hm-modal-form">
@@ -716,6 +790,82 @@ export const HealthMgmt: React.FC = () => {
               value={editDosage}
               onChange={e => setEditDosage(e.target.value)}
               maxLength={256}
+              required
+              style={{ resize: 'vertical' }}
+            />
+          </div>
+        </form>
+      </Modal>
+
+      {/* ── Edit Mortality Audit Record Modal ── */}
+      <Modal
+        isOpen={isEditMortalityModalOpen}
+        onClose={() => setIsEditMortalityModalOpen(false)}
+        title={`Edit Mortality Record: Batch ${editMortalityBatchId}`}
+        footer={
+          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+            <button
+              type="button"
+              className="btn btn-danger"
+              onClick={async () => {
+                if (window.confirm(`Are you sure you want to delete this mortality record (${editMortalityOldQty} birds)? This will restore ${editMortalityOldQty} birds back to Batch ${editMortalityBatchId}.`)) {
+                  await deleteMortalityLog(editMortalityId, editMortalityBatchId, editMortalityOldQty);
+                  setIsEditMortalityModalOpen(false);
+                }
+              }}
+            >
+              🗑️ Delete Record
+            </button>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button type="button" className="btn btn-secondary" onClick={() => setIsEditMortalityModalOpen(false)}>Cancel</button>
+              <button type="button" className="btn btn-primary" onClick={handleEditMortalitySubmit}>Save Record Changes</button>
+            </div>
+          </div>
+        }
+      >
+        <form onSubmit={handleEditMortalitySubmit} className="hm-modal-form">
+          <div className="form-group">
+            <label className="form-label">Batch Reference</label>
+            <input
+              type="text"
+              className="form-control"
+              value={editMortalityBatchId}
+              disabled
+            />
+          </div>
+
+          <div className="hm-form-row">
+            <div className="form-group">
+              <label className="form-label">Date of Event</label>
+              <input
+                type="date"
+                className="form-control"
+                value={editMortalityDate}
+                onChange={e => setEditMortalityDate(e.target.value)}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Quantity Lost (Birds)</label>
+              <input
+                type="number"
+                min="1"
+                className="form-control"
+                value={editMortalityNewQty}
+                onChange={e => setEditMortalityNewQty(Number(e.target.value))}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Reason / Diagnosis</label>
+            <textarea
+              className="form-control"
+              rows={3}
+              value={editMortalityReason}
+              onChange={e => setEditMortalityReason(e.target.value)}
+              maxLength={500}
               required
               style={{ resize: 'vertical' }}
             />

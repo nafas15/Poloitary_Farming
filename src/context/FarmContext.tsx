@@ -121,6 +121,10 @@ export interface UserCredential {
   password: string;
   role: UserRole;
   approved: boolean;
+  fullName?: string;
+  dob?: string;
+  securityQuestion?: string;
+  securityAnswer?: string;
 }
 
 interface FarmContextType {
@@ -145,6 +149,8 @@ interface FarmContextType {
     oldBalance?: number
   ) => void;
   logMortality: (batchId: string, quantity: number, reason: string, date: string) => void;
+  updateMortalityLog: (id: string, batchId: string, oldQty: number, newQty: number, reason: string, date: string) => Promise<void>;
+  deleteMortalityLog: (id: string, batchId: string, qty: number) => Promise<void>;
   feedPurchases: FeedPurchase[];
   addFeedPurchase: (purchase: Omit<FeedPurchase, 'id'>) => void;
   feedConsumption: FeedConsumption[];
@@ -155,6 +161,7 @@ interface FarmContextType {
   deleteVaccineSchedule: (id: string) => void;
   medicalRecords: MedicalRecord[];
   addMedicalRecord: (record: Omit<MedicalRecord, 'id'>) => void;
+  deleteMedicalRecord: (id: string) => Promise<void>;
   eggCollections: EggCollection[];
   addEggCollection: (collection: EggCollection) => void;
   deleteEggCollection: (date: string) => void;
@@ -179,6 +186,8 @@ interface FarmContextType {
   approveUser: (username: string) => void;
   updateUserRole: (username: string, role: UserRole) => void;
   updateUserProfile: (oldUsername: string, newUsername: string, newPassword?: string, oldPassword?: string) => { success: boolean; message: string };
+  resetUserPassword: (username: string, newPassword: string) => { success: boolean; message: string };
+  verifyAndResetPassword: (username: string, dob: string, answer: string, newPassword: string) => { success: boolean; message: string };
   deleteUser: (username: string) => void;
   isLoading: boolean;
 }
@@ -215,8 +224,26 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [usersList, setUsersList] = useState<UserCredential[]>(() => {
     try {
       const defaultUsers: UserCredential[] = [
-        { username: 'admin', password: 'admin', role: 'Admin', approved: true },
-        { username: 'employee', password: 'employee', role: 'Employee', approved: true }
+        {
+          username: 'admin',
+          password: 'admin',
+          role: 'Admin',
+          approved: true,
+          fullName: 'Farm Administrator',
+          dob: '2001-02-23',
+          securityQuestion: 'What is the name of your farm?',
+          securityAnswer: 'Aksha Farm'
+        },
+        {
+          username: 'employee',
+          password: 'employee',
+          role: 'Employee',
+          approved: true,
+          fullName: 'Aksha Staff Member',
+          dob: '1995-05-15',
+          securityQuestion: 'What is the name of your farm?',
+          securityAnswer: 'Aksha Farm'
+        }
       ];
       const stored = localStorage.getItem('poultry_users_list');
       if (!stored) {
@@ -224,10 +251,18 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return defaultUsers;
       }
       const parsed = JSON.parse(stored) as UserCredential[];
-      return parsed.map(u => ({
-        ...u,
-        approved: u.approved !== undefined ? u.approved : true
-      }));
+      return parsed.map(u => {
+        const isAdmin = u.username.toLowerCase() === 'admin';
+        const matchDefault = defaultUsers.find(d => d.username.toLowerCase() === u.username.toLowerCase());
+        return {
+          ...u,
+          approved: u.approved !== undefined ? u.approved : true,
+          fullName: u.fullName || matchDefault?.fullName || u.username,
+          dob: isAdmin ? '2001-02-23' : (u.dob || matchDefault?.dob || '1995-05-15'),
+          securityQuestion: u.securityQuestion || matchDefault?.securityQuestion || 'What is the name of your farm?',
+          securityAnswer: u.securityAnswer || matchDefault?.securityAnswer || 'Aksha Farm'
+        };
+      });
     } catch {
       return [];
     }
@@ -255,15 +290,16 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const fetchAllData = async () => {
     try {
       const [
-        { data: batchesData, error: batchesErr },
-        { data: mortalityData, error: mortalityErr },
-        { data: feedPurchasesData, error: fpErr },
-        { data: feedConsumptionData, error: fcErr },
-        { data: vaccinesData, error: vErr },
-        { data: medicalRecordsData, error: mrErr },
-        { data: eggCollectionsData, error: ecErr },
-        { data: salesData, error: sErr },
-        { data: expensesData, error: expErr }
+        { data: batchesData },
+        { data: mortalityData },
+        { data: feedPurchasesData },
+        { data: feedConsumptionData },
+        { data: vaccinesData },
+        { data: medicalRecordsData },
+        { data: eggCollectionsData },
+        { data: salesData },
+        { data: expensesData },
+        { data: usersData, error: usersErr }
       ] = await Promise.all([
         supabase.from('batches').select('*'),
         supabase.from('mortality_logs').select('*'),
@@ -273,14 +309,46 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
         supabase.from('medical_records').select('*'),
         supabase.from('egg_collections').select('*'),
         supabase.from('sales').select('*'),
-        supabase.from('expenses').select('*')
+        supabase.from('expenses').select('*'),
+        supabase.from('users').select('*')
       ]);
 
-      if (batchesErr || mortalityErr || fpErr || fcErr || vErr || mrErr || ecErr || sErr || expErr) {
-        console.error('Error fetching data from Supabase:', {
-          batchesErr, mortalityErr, fpErr, fcErr, vErr, mrErr, ecErr, sErr, expErr
-        });
-        return;
+      if (usersData && usersData.length > 0) {
+        const formattedUsers: UserCredential[] = usersData.map((u: any) => ({
+          username: u.username,
+          password: u.password,
+          role: u.role as UserRole,
+          approved: Boolean(u.approved),
+          fullName: u.full_name || u.username,
+          dob: u.dob || (u.username === 'admin' ? '2001-02-23' : '1995-05-15'),
+          securityQuestion: u.security_question || 'What is the name of your farm?',
+          securityAnswer: u.security_answer || 'Aksha Farm'
+        }));
+        setUsersList(formattedUsers);
+      } else if (!usersErr) {
+        // Seed default admin and employee into Supabase users table
+        await supabase.from('users').upsert([
+          {
+            username: 'admin',
+            password: 'admin',
+            role: 'Admin',
+            approved: true,
+            full_name: 'Farm Administrator',
+            dob: '2001-02-23',
+            security_question: 'What is the name of your farm?',
+            security_answer: 'Aksha Farm'
+          },
+          {
+            username: 'employee',
+            password: 'employee',
+            role: 'Employee',
+            approved: true,
+            full_name: 'Aksha Staff Member',
+            dob: '1995-05-15',
+            security_question: 'What is the name of your farm?',
+            security_answer: 'Aksha Farm'
+          }
+        ]);
       }
 
       // Map Batches and their Mortality Logs
@@ -498,7 +566,23 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: false, message: `A user with username "${trimmedUser}" already exists.` };
     }
 
-    setUsersList(prev => [...prev, { ...newUser, username: trimmedUser }]);
+    const created = { ...newUser, username: trimmedUser };
+    setUsersList(prev => [...prev, created]);
+
+    // Sync to Supabase users table
+    supabase.from('users').upsert({
+      username: trimmedUser,
+      password: newUser.password,
+      role: newUser.role,
+      approved: Boolean(newUser.approved),
+      full_name: newUser.fullName || trimmedUser,
+      dob: newUser.dob || '2001-02-23',
+      security_question: newUser.securityQuestion || 'What is the name of your farm?',
+      security_answer: newUser.securityAnswer || 'Aksha Farm'
+    }).then((res: any) => {
+      if (res.error) console.error('Error saving user to Supabase:', res.error);
+    });
+
     return { success: true, message: 'Account created successfully! Please wait for an administrator to approve it.' };
   };
 
@@ -506,12 +590,18 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUsersList(prev =>
       prev.map(u => (u.username.toLowerCase() === username.toLowerCase() ? { ...u, approved: true } : u))
     );
+    supabase.from('users').update({ approved: true }).eq('username', username).then((res: any) => {
+      if (res.error) console.error('Error approving user in Supabase:', res.error);
+    });
   };
 
   const updateUserRole = (username: string, role: UserRole) => {
     setUsersList(prev =>
       prev.map(u => (u.username.toLowerCase() === username.toLowerCase() ? { ...u, role } : u))
     );
+    supabase.from('users').update({ role }).eq('username', username).then((res: any) => {
+      if (res.error) console.error('Error updating role in Supabase:', res.error);
+    });
   };
 
   const updateUserProfile = (
@@ -571,11 +661,89 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCurrentUser(prev => prev ? { ...prev, username: trimmedNewUsername } : null);
     }
 
+    supabase.from('users').update({
+      username: trimmedNewUsername,
+      ...(newPassword ? { password: newPassword } : {})
+    }).eq('username', oldUsername).then((res: any) => {
+      if (res.error) console.error('Error updating user profile in Supabase:', res.error);
+    });
+
     return { success: true, message: 'Profile updated successfully!' };
+  };
+
+  const resetUserPassword = (username: string, newPassword: string): { success: boolean; message: string } => {
+    const trimmed = username.trim();
+    if (!trimmed) {
+      return { success: false, message: 'Username is required.' };
+    }
+    if (!newPassword || newPassword.length < 4) {
+      return { success: false, message: 'Password must be at least 4 characters long.' };
+    }
+
+    const userToUpdate = usersList.find(u => u.username.toLowerCase() === trimmed.toLowerCase());
+    if (!userToUpdate) {
+      return { success: false, message: `No account found for username "${trimmed}".` };
+    }
+
+    setUsersList(prev =>
+      prev.map(u => (u.username.toLowerCase() === trimmed.toLowerCase() ? { ...u, password: newPassword } : u))
+    );
+
+    supabase.from('users').update({ password: newPassword }).eq('username', trimmed).then((res: any) => {
+      if (res.error) console.error('Error resetting password in Supabase:', res.error);
+    });
+
+    return { success: true, message: 'Password updated successfully! You can now log in with your new password.' };
+  };
+
+  const verifyAndResetPassword = (
+    username: string,
+    dob: string,
+    answer: string,
+    newPassword: string
+  ): { success: boolean; message: string } => {
+    const trimmedUser = username.trim();
+    const trimmedDob = dob.trim();
+    const trimmedAnswer = answer.trim();
+    if (!trimmedUser || !trimmedDob || !trimmedAnswer || !newPassword) {
+      return { success: false, message: 'Please fill in all required fields (DOB, Security Answer, New Password).' };
+    }
+    if (newPassword.length < 4) {
+      return { success: false, message: 'New password must be at least 4 characters long.' };
+    }
+
+    const user = usersList.find(u => u.username.toLowerCase() === trimmedUser.toLowerCase());
+    if (!user) {
+      return { success: false, message: `No account found with username "${trimmedUser}".` };
+    }
+
+    // Verify DOB if account has DOB set
+    if (user.dob && user.dob !== trimmedDob) {
+      return { success: false, message: 'Date of Birth does not match account records.' };
+    }
+
+    // Verify Security Answer
+    const storedAnswer = user.securityAnswer ? user.securityAnswer.trim().toLowerCase() : 'aksha farm';
+    if (storedAnswer !== trimmedAnswer.toLowerCase()) {
+      return { success: false, message: 'Incorrect security answer. Verification failed.' };
+    }
+
+    setUsersList(prev =>
+      prev.map(u => (u.username.toLowerCase() === trimmedUser.toLowerCase() ? { ...u, password: newPassword } : u))
+    );
+
+    supabase.from('users').update({ password: newPassword }).eq('username', trimmedUser).then((res: any) => {
+      if (res.error) console.error('Error resetting password in Supabase:', res.error);
+    });
+
+    return { success: true, message: 'Identity verification successful! Your password has been updated. Please sign in.' };
   };
 
   const deleteUser = (username: string) => {
     setUsersList(prev => prev.filter(u => u.username.toLowerCase() !== username.toLowerCase()));
+    supabase.from('users').delete().eq('username', username).then((res: any) => {
+      if (res.error) console.error('Error deleting user from Supabase:', res.error);
+    });
   };
 
   // 1. Bird Management
@@ -780,8 +948,61 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .eq('id', batchId),
         supabase.from('mortality_logs').insert(newLog)
       ]);
+      fetchAllData();
     } catch (err) {
       console.error('Failed to log mortality:', err);
+    }
+  };
+
+  const updateMortalityLog = async (id: string, batchId: string, oldQty: number, newQty: number, reason: string, date: string) => {
+    try {
+      const { data: batch } = await supabase
+        .from('batches')
+        .select('current_quantity')
+        .eq('id', batchId)
+        .single();
+
+      if (!batch) return;
+
+      const diff = newQty - oldQty;
+      const updatedCurrentQty = Math.max(0, batch.current_quantity - diff);
+
+      await Promise.all([
+        supabase
+          .from('batches')
+          .update({ current_quantity: updatedCurrentQty })
+          .eq('id', batchId),
+        supabase
+          .from('mortality_logs')
+          .update({ quantity: newQty, reason, date })
+          .eq('id', id)
+      ]);
+
+      fetchAllData();
+    } catch (err) {
+      console.error('Failed to update mortality log:', err);
+    }
+  };
+
+  const deleteMortalityLog = async (id: string, batchId: string, qty: number) => {
+    try {
+      const { data: batch } = await supabase
+        .from('batches')
+        .select('current_quantity')
+        .eq('id', batchId)
+        .single();
+
+      if (batch) {
+        await supabase
+          .from('batches')
+          .update({ current_quantity: batch.current_quantity + qty })
+          .eq('id', batchId);
+      }
+
+      await supabase.from('mortality_logs').delete().eq('id', id);
+      fetchAllData();
+    } catch (err) {
+      console.error('Failed to delete mortality log:', err);
     }
   };
 
@@ -1285,6 +1506,18 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const deleteMedicalRecord = async (id: string) => {
+    try {
+      await Promise.all([
+        supabase.from('medical_records').delete().eq('id', id),
+        supabase.from('expenses').delete().eq('reference_id', id).eq('is_auto_generated', true)
+      ]);
+      fetchAllData();
+    } catch (err) {
+      console.error('Failed to delete medical record:', err);
+    }
+  };
+
   const updateEggCollection = async (originalDate: string, updated: EggCollection) => {
     try {
       if (originalDate !== updated.date) {
@@ -1498,6 +1731,8 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
         deleteBatch,
         sellBatch,
         logMortality,
+        updateMortalityLog,
+        deleteMortalityLog,
         feedPurchases,
         addFeedPurchase,
         feedConsumption,
@@ -1508,6 +1743,7 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
         deleteVaccineSchedule,
         medicalRecords,
         addMedicalRecord,
+        deleteMedicalRecord,
         eggCollections,
         addEggCollection,
         deleteEggCollection,
@@ -1532,6 +1768,8 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
         approveUser,
         updateUserRole,
         updateUserProfile,
+        resetUserPassword,
+        verifyAndResetPassword,
         deleteUser,
         isLoading
       }}

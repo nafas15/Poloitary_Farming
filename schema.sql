@@ -101,6 +101,25 @@ CREATE TABLE IF NOT EXISTS expenses (
     reference_id TEXT
 );
 
+-- 10. Users Table (Admin & Employee Credentials & Verification Details)
+CREATE TABLE IF NOT EXISTS users (
+    username TEXT PRIMARY KEY,
+    password TEXT NOT NULL,
+    role TEXT CHECK (role IN ('Admin', 'Employee')) NOT NULL,
+    approved BOOLEAN DEFAULT TRUE NOT NULL,
+    full_name TEXT,
+    dob DATE,
+    security_question TEXT,
+    security_answer TEXT
+);
+
+-- Initial Default Users
+INSERT INTO users (username, password, role, approved, full_name, dob, security_question, security_answer)
+VALUES 
+    ('admin', 'admin', 'Admin', true, 'Farm Administrator', '2001-02-23', 'What is the name of your farm?', 'Aksha Farm'),
+    ('employee', 'employee', 'Employee', true, 'Aksha Staff Member', '1995-05-15', 'What is the name of your farm?', 'Aksha Farm')
+ON CONFLICT (username) DO NOTHING;
+
 -- =========================================================================
 -- ROW LEVEL SECURITY (RLS) POLICIES
 -- Enables security, but allows all anon/authenticated access for development ease
@@ -115,6 +134,7 @@ ALTER TABLE medical_records ENABLE ROW LEVEL SECURITY;
 ALTER TABLE egg_collections ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sales ENABLE ROW LEVEL SECURITY;
 ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow public access to batches" ON batches FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow public access to mortality_logs" ON mortality_logs FOR ALL USING (true) WITH CHECK (true);
@@ -125,6 +145,7 @@ CREATE POLICY "Allow public access to medical_records" ON medical_records FOR AL
 CREATE POLICY "Allow public access to egg_collections" ON egg_collections FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow public access to sales" ON sales FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow public access to expenses" ON expenses FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public access to users" ON users FOR ALL USING (true) WITH CHECK (true);
 
 -- =========================================================================
 -- REALTIME SUB-PUBLICATION SETUP
@@ -140,6 +161,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE medical_records;
 ALTER PUBLICATION supabase_realtime ADD TABLE egg_collections;
 ALTER PUBLICATION supabase_realtime ADD TABLE sales;
 ALTER PUBLICATION supabase_realtime ADD TABLE expenses;
+ALTER PUBLICATION supabase_realtime ADD TABLE users;
 
 -- =========================================================================
 -- DATABASE MIGRATIONS (For existing databases)
@@ -149,5 +171,6 @@ ALTER TABLE batches ADD COLUMN IF NOT EXISTS purchase_price_per_kg NUMERIC;
 ALTER TABLE sales ADD COLUMN IF NOT EXISTS weight_kg NUMERIC;
 ALTER TABLE sales ADD COLUMN IF NOT EXISTS price_per_kg NUMERIC;
 ALTER TABLE sales ADD COLUMN IF NOT EXISTS amount_paid NUMERIC DEFAULT 0;
+
 
 

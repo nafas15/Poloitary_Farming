@@ -34,6 +34,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, toggleSidebar }) => {
       case 'health': return 'Vaccinations & Medical Logs';
       case 'eggs': return 'Egg Production Reports';
       case 'sales': return 'Sales Ledger & Invoicing';
+      case 'invoices': return 'Quick Custom Invoice Generator';
       case 'expenses': return 'Expense Tracker';
       case 'profit-loss': return 'Profit & Loss Statement';
       case 'reports': return 'Farm Performance Reports';

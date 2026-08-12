@@ -80,7 +80,8 @@ export const EmployeeMgmt: React.FC = () => {
             <table className="custom-table">
               <thead>
                 <tr>
-                  <th>Username</th>
+                  <th>Employee Details</th>
+                  <th>Date of Birth</th>
                   <th>Requested Role</th>
                   <th>Status</th>
                   <th style={{ textAlign: 'right' }}>Actions</th>
@@ -92,10 +93,16 @@ export const EmployeeMgmt: React.FC = () => {
                     <td>
                       <div className="user-cell">
                         <div className="avatar-small">
-                          {user.username.substring(0, 2).toUpperCase()}
+                          {(user.fullName || user.username).substring(0, 2).toUpperCase()}
                         </div>
-                        <span className="user-name">{user.username}</span>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span className="user-name" style={{ fontWeight: 650 }}>{user.fullName || user.username}</span>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>@{user.username}</span>
+                        </div>
                       </div>
+                    </td>
+                    <td>
+                      <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>{user.dob || 'Not provided'}</span>
                     </td>
                     <td>
                       <span className={`role-badge ${user.role.toLowerCase()}`}>
@@ -161,7 +168,8 @@ export const EmployeeMgmt: React.FC = () => {
             <table className="custom-table">
               <thead>
                 <tr>
-                  <th>Username</th>
+                  <th>Employee Details</th>
+                  <th>Date of Birth</th>
                   <th>Role</th>
                   <th>Status</th>
                   <th style={{ textAlign: 'right' }}>Actions</th>
@@ -175,12 +183,16 @@ export const EmployeeMgmt: React.FC = () => {
                       <td>
                         <div className="user-cell">
                           <div className="avatar-small">
-                            {user.username.substring(0, 2).toUpperCase()}
+                            {(user.fullName || user.username).substring(0, 2).toUpperCase()}
                           </div>
                           <div style={{ display: 'flex', flexDirection: 'column' }}>
-                            <span className="user-name">{user.username} {isSelf && <span className="self-tag">(You)</span>}</span>
+                            <span className="user-name" style={{ fontWeight: 650 }}>{user.fullName || user.username} {isSelf && <span className="self-tag">(You)</span>}</span>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>@{user.username}</span>
                           </div>
                         </div>
+                      </td>
+                      <td>
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>{user.dob || 'Not provided'}</span>
                       </td>
                       <td>
                         <span className={`role-badge ${user.role.toLowerCase()}`}>
