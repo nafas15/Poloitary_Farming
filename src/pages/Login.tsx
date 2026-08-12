@@ -349,7 +349,7 @@ export const Login: React.FC = () => {
           display: flex;
           align-items: center;
           justify-content: center;
-          background: #060913;
+          background: linear-gradient(135deg, #f0fdf4 0%, #e2e8f0 45%, #ecfdf5 100%);
           position: relative;
           overflow: hidden;
           font-family: var(--font-family);
@@ -368,103 +368,145 @@ export const Login: React.FC = () => {
         .login-bg-glows .glow {
           position: absolute;
           border-radius: 50%;
-          filter: blur(140px);
-          opacity: 0.15;
+          filter: blur(120px);
+          opacity: 0.25;
         }
 
         .glow-1 {
-          width: 400px;
-          height: 400px;
-          background: var(--color-emerald);
-          top: -100px;
+          width: 450px;
+          height: 450px;
+          background: #34d399;
+          top: -120px;
           left: -100px;
         }
 
         .glow-2 {
-          width: 500px;
-          height: 500px;
-          background: var(--color-indigo);
-          bottom: -150px;
-          right: -100px;
+          width: 550px;
+          height: 550px;
+          background: #818cf8;
+          bottom: -160px;
+          right: -120px;
         }
 
         .login-card {
           width: 100%;
           max-width: 420px;
-          padding: var(--spacing-xl) !important;
+          padding: 2.25rem !important;
           z-index: 10;
-          border-radius: var(--radius-xl) !important;
-          background: var(--bg-card);
-          box-shadow: var(--card-shadow);
-          border: 1px solid var(--border-color);
-          transition: background-color var(--transition-normal), border-color var(--transition-normal);
+          border-radius: 20px !important;
+          background: rgba(255, 255, 255, 0.94);
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
+          box-shadow: 0 20px 45px -10px rgba(15, 23, 42, 0.12), 0 0 25px rgba(16, 185, 129, 0.08);
+          border: 1px solid rgba(16, 185, 129, 0.2);
+          transition: all 0.3s ease;
         }
 
         .login-header {
           text-align: center;
-          margin-bottom: var(--spacing-xl);
+          margin-bottom: 1.75rem;
         }
 
         .login-logo {
-          font-size: 3rem;
-          margin-bottom: var(--spacing-sm);
-          filter: drop-shadow(0 0 10px rgba(16, 185, 129, 0.4));
+          font-size: 3.2rem;
+          margin-bottom: 0.25rem;
+          filter: drop-shadow(0 4px 12px rgba(16, 185, 129, 0.3));
         }
 
         .login-header h2 {
-          font-size: 1.6rem;
-          font-weight: 700;
-          color: var(--text-primary);
+          font-size: 1.65rem;
+          font-weight: 800;
+          color: #0f172a;
+          letter-spacing: -0.03em;
         }
 
         .login-header p {
           font-size: 0.85rem;
-          color: var(--text-secondary);
-          margin-top: var(--spacing-xs);
+          color: #475569;
+          margin-top: 0.2rem;
+          font-weight: 500;
         }
 
         .form-section-title {
-          font-size: 1.2rem;
-          font-weight: 650;
-          color: var(--text-primary);
-          margin-bottom: var(--spacing-md);
+          font-size: 1.15rem;
+          font-weight: 700;
+          color: #1e293b;
+          margin-bottom: 1rem;
           text-align: center;
         }
 
         .form-section-desc {
           font-size: 0.82rem;
-          color: var(--text-secondary);
-          margin-bottom: var(--spacing-md);
+          color: #64748b;
+          margin-bottom: 1rem;
           text-align: center;
           line-height: 1.4;
         }
 
+        .login-card .form-label {
+          color: #1e293b;
+          font-weight: 600;
+          font-size: 0.88rem;
+        }
+
+        .login-card .form-control {
+          background: #ffffff !important;
+          color: #0f172a !important;
+          border: 1.5px solid #cbd5e1 !important;
+          font-size: 0.95rem;
+          padding: 0.75rem 1rem;
+          border-radius: 10px;
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+          transition: all 0.2s ease;
+        }
+
+        .login-card .form-control::placeholder {
+          color: #94a3b8 !important;
+          opacity: 1;
+        }
+
+        .login-card .form-control:focus {
+          border-color: #059669 !important;
+          background: #ffffff !important;
+          color: #0f172a !important;
+          box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.18) !important;
+        }
+
+        .login-card input:-webkit-autofill,
+        .login-card input:-webkit-autofill:hover,
+        .login-card input:-webkit-autofill:focus,
+        .login-card input:-webkit-autofill:active {
+          -webkit-text-fill-color: #0f172a !important;
+          -webkit-box-shadow: 0 0 0px 1000px #ffffff inset !important;
+          transition: background-color 5000s ease-in-out 0s;
+        }
+
         .role-selector {
           display: flex;
-          gap: var(--spacing-md);
-          margin-bottom: var(--spacing-lg);
-          background: var(--glass-button-bg);
-          padding: var(--spacing-xs);
-          border-radius: var(--radius-md);
-          border: 1px solid var(--border-color);
+          gap: 0.5rem;
+          margin-bottom: 1.25rem;
+          background: #f1f5f9;
+          padding: 0.3rem;
+          border-radius: 12px;
+          border: 1px solid #e2e8f0;
         }
 
         .role-btn {
           flex: 1;
           background: none;
           border: none;
-          color: var(--text-secondary);
-          padding: 0.5rem;
-          border-radius: var(--radius-sm);
+          color: #64748b;
+          padding: 0.55rem;
+          border-radius: 8px;
           font-family: var(--font-family);
           font-weight: 600;
           font-size: 0.85rem;
           cursor: pointer;
-          transition: all var(--transition-fast);
+          transition: all 0.2s ease;
         }
 
         .role-btn:hover {
-          color: var(--text-primary);
+          color: #0f172a;
         }
 
         .role-btn.active {
@@ -472,36 +514,36 @@ export const Login: React.FC = () => {
         }
 
         .role-btn.active.admin {
-          background: var(--color-indigo);
-          box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+          background: #4f46e5;
+          box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
         }
 
         .role-btn.active.employee {
-          background: var(--color-emerald);
-          box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+          background: #059669;
+          box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
         }
 
         .login-error-alert {
-          background: var(--color-rose-glow);
-          color: var(--color-rose);
-          border: 1px solid rgba(244, 63, 94, 0.2);
+          background: #fef2f2;
+          color: #dc2626;
+          border: 1px solid #fecaca;
           padding: 0.75rem;
-          border-radius: var(--radius-md);
+          border-radius: 10px;
           font-size: 0.82rem;
-          font-weight: 500;
-          margin-bottom: var(--spacing-lg);
+          font-weight: 600;
+          margin-bottom: 1rem;
           animation: slideUp 0.2s ease-out;
         }
 
         .login-success-alert {
-          background: var(--color-emerald-glow);
-          color: var(--color-emerald);
-          border: 1px solid rgba(16, 185, 129, 0.2);
+          background: #ecfdf5;
+          color: #059669;
+          border: 1px solid #a7f3d0;
           padding: 0.75rem;
-          border-radius: var(--radius-md);
+          border-radius: 10px;
           font-size: 0.82rem;
-          font-weight: 500;
-          margin-bottom: var(--spacing-lg);
+          font-weight: 600;
+          margin-bottom: 1rem;
           animation: slideUp 0.2s ease-out;
         }
 
@@ -509,32 +551,44 @@ export const Login: React.FC = () => {
           width: 100%;
           padding: 0.8rem;
           font-size: 1rem;
-          margin-top: var(--spacing-sm);
+          font-weight: 600;
+          margin-top: 0.5rem;
+          background: linear-gradient(135deg, #059669 0%, #10b981 100%) !important;
+          color: #ffffff !important;
+          border: none !important;
+          border-radius: 10px !important;
+          box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35) !important;
+          transition: all 0.2s ease;
+        }
+
+        .login-submit-btn:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 6px 20px rgba(16, 185, 129, 0.45) !important;
         }
 
         .auth-footer-links {
           display: flex;
           justify-content: center;
           gap: 0.25rem;
-          font-size: 0.82rem;
-          color: var(--text-secondary);
-          margin-top: var(--spacing-lg);
+          font-size: 0.85rem;
+          color: #475569;
+          margin-top: 1.25rem;
         }
 
         .text-link {
           background: none;
           border: none;
-          color: var(--color-emerald);
-          font-weight: 600;
+          color: #059669;
+          font-weight: 700;
           cursor: pointer;
           padding: 0;
           font-family: var(--font-family);
-          font-size: 0.82rem;
-          transition: color var(--transition-fast);
+          font-size: 0.85rem;
+          transition: color 0.2s ease;
         }
 
         .text-link:hover {
-          color: var(--color-cyan);
+          color: #047857;
           text-decoration: underline;
         }
 
@@ -542,7 +596,7 @@ export const Login: React.FC = () => {
         .spinner-loader {
           width: 20px;
           height: 20px;
-          border: 2px solid rgba(255, 255, 255, 0.3);
+          border: 2px solid rgba(255, 255, 255, 0.4);
           border-top-color: #ffffff;
           border-radius: 50%;
           animation: spin 0.8s linear infinite;
@@ -554,13 +608,13 @@ export const Login: React.FC = () => {
 
         @media (max-width: 480px) {
           .login-card {
-            padding: var(--spacing-lg) !important;
-            margin: var(--spacing-md);
+            padding: 1.5rem !important;
+            margin: 1rem;
             max-width: calc(100% - 2rem);
           }
           .role-selector {
             flex-direction: column;
-            gap: var(--spacing-xs);
+            gap: 0.3rem;
           }
         }
       `}</style>
