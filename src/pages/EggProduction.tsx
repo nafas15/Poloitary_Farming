@@ -2,6 +2,22 @@ import React, { useState } from 'react';
 import { useFarm } from '../context/FarmContext';
 import { Modal } from '../components/Modal';
 
+interface SaleAdditionalCharge {
+  id: string;
+  name: string;
+  amount: number;
+}
+
+const PRESET_CHARGES = [
+  'Transport',
+  'Loading',
+  'Discount',
+  'Previous Arrears',
+  'GST / Tax',
+  'Packing Fee',
+  'Handling'
+];
+
 export const EggProduction: React.FC = () => {
   const { eggCollections, addEggCollection, deleteEggCollection, addEggSale, updateEggCollection, sales } = useFarm();
   
@@ -42,14 +58,32 @@ export const EggProduction: React.FC = () => {
 
   // Form Fields - Sell Eggs
   const [eggQty, setEggQty] = useState<number>(300);
-  const [eggPricePerEgg, setEggPricePerEgg] = useState<number>(0.20);
+  const [eggPricePerEgg, setEggPricePerEgg] = useState<number>(30);
   const [eggCustomer, setEggCustomer] = useState('');
   const [eggContact, setEggContact] = useState('');
   const [eggDetails, setEggDetails] = useState('');
   const [eggAmountPaid, setEggAmountPaid] = useState<number>(0);
   const [isEggAmountPaidCustom, setIsEggAmountPaidCustom] = useState<boolean>(false);
-  const [eggTransport, setEggTransport] = useState<number>(0);
-  const [eggOther, setEggOther] = useState<number>(0);
+
+  // Dynamic Additional Charges for Egg Sale
+  const [additionalCharges, setAdditionalCharges] = useState<SaleAdditionalCharge[]>([]);
+
+  const handleAddCharge = () => {
+    setAdditionalCharges(prev => [
+      ...prev,
+      { id: `chg-${Date.now()}`, name: 'Transport', amount: 0 }
+    ]);
+  };
+
+  const handleUpdateCharge = (id: string, field: keyof SaleAdditionalCharge, value: any) => {
+    setAdditionalCharges(prev =>
+      prev.map(c => (c.id === id ? { ...c, [field]: value } : c))
+    );
+  };
+
+  const handleRemoveCharge = (id: string) => {
+    setAdditionalCharges(prev => prev.filter(c => c.id !== id));
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,7 +105,17 @@ export const EggProduction: React.FC = () => {
     e.preventDefault();
     if (!eggCustomer.trim() || eggQty <= 0) return;
     const subtotal = eggQty * eggPricePerEgg;
-    const computedTotal = subtotal + eggTransport + eggOther;
+    
+    // Separate transport from other charges for DB compatibility
+    const computedTransport = additionalCharges
+      .filter(c => c.name.toLowerCase().includes('transport') || c.name.toLowerCase().includes('freight'))
+      .reduce((sum, c) => sum + Number(c.amount || 0), 0);
+
+    const computedOther = additionalCharges
+      .filter(c => !c.name.toLowerCase().includes('transport') && !c.name.toLowerCase().includes('freight'))
+      .reduce((sum, c) => sum + Number(c.amount || 0), 0);
+
+    const computedTotal = subtotal + computedTransport + computedOther;
     const finalPaid = isEggAmountPaidCustom ? eggAmountPaid : computedTotal;
     
     addEggSale({
@@ -82,8 +126,8 @@ export const EggProduction: React.FC = () => {
       unitPrice: eggPricePerEgg,
       totalAmount: subtotal,
       amountPaid: finalPaid,
-      transportCharges: eggTransport,
-      otherCharges: eggOther,
+      transportCharges: computedTransport,
+      otherCharges: computedOther,
       oldBalance: customerOldBalance,
       details: eggDetails || `Egg Sale: ${eggQty} eggs`
     });
@@ -93,8 +137,7 @@ export const EggProduction: React.FC = () => {
     setEggQty(300);
     setEggAmountPaid(0);
     setIsEggAmountPaidCustom(false);
-    setEggTransport(0);
-    setEggOther(0);
+    setAdditionalCharges([]);
     setIsSellModalOpen(false);
   };
 
@@ -120,14 +163,13 @@ export const EggProduction: React.FC = () => {
         <div style={{ display: 'flex', gap: '0.75rem' }}>
           <button type="button" className="btn btn-secondary" onClick={() => {
             setEggQty(300);
-            setEggPricePerEgg(0.20);
+            setEggPricePerEgg(30);
             setEggCustomer('');
             setEggContact('');
             setEggDetails('');
             setEggAmountPaid(0);
             setIsEggAmountPaidCustom(false);
-            setEggTransport(0);
-            setEggOther(0);
+            setAdditionalCharges([]);
             setIsSellModalOpen(true);
           }}>
             🥚 Sell Eggs
@@ -377,6 +419,7 @@ export const EggProduction: React.FC = () => {
                 className="form-control"
                 value={eggQty}
                 onChange={e => setEggQty(Number(e.target.value))}
+                onWheel={e => (e.target as HTMLElement).blur()}
                 required
               />
             </div>
@@ -389,6 +432,7 @@ export const EggProduction: React.FC = () => {
                 className="form-control"
                 value={eggPricePerEgg}
                 onChange={e => setEggPricePerEgg(Number(e.target.value))}
+                onWheel={e => (e.target as HTMLElement).blur()}
                 required
               />
             </div>
@@ -399,8 +443,9 @@ export const EggProduction: React.FC = () => {
               <label className="form-label">Customer Name</label>
               <input
                 type="text"
+                list="egg-customer-list"
                 className="form-control"
-                placeholder="e.g. Sunny Bakehouses Co."
+                placeholder="Type to search customers..."
                 value={eggCustomer}
                 onChange={e => {
                   setEggCustomer(e.target.value);
@@ -411,6 +456,11 @@ export const EggProduction: React.FC = () => {
                 }}
                 required
               />
+              <datalist id="egg-customer-list">
+                {Array.from(new Set(sales.map(s => s.customerName))).map(name => (
+                  <option key={name} value={name} />
+                ))}
+              </datalist>
               {customerOldBalance > 0 && (
                 <span style={{ fontSize: '0.78rem', color: 'var(--color-rose)', fontWeight: 'bold', marginTop: '0.2rem', display: 'block' }}>
                   ⚠️ Outstanding Balance: Rs {customerOldBalance.toFixed(2)}
@@ -441,36 +491,117 @@ export const EggProduction: React.FC = () => {
             />
           </div>
 
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">Transport Charges (Rs)</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                className="form-control"
-                value={eggTransport || ''}
-                onChange={e => setEggTransport(Number(e.target.value))}
-                placeholder="0.00"
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Other Charges (Rs)</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                className="form-control"
-                value={eggOther || ''}
-                onChange={e => setEggOther(Number(e.target.value))}
-                placeholder="0.00"
-              />
-            </div>
+          {/* Dynamic Additional Charges & Adjustments List */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.75rem', marginBottom: '0.4rem' }}>
+            <label className="form-label" style={{ margin: 0, fontWeight: 700, fontSize: '0.83rem' }}>
+              Additional Charges & Adjustments
+            </label>
+            <button
+              type="button"
+              className="btn-nice-outline"
+              onClick={handleAddCharge}
+              style={{
+                background: 'rgba(16, 185, 129, 0.08)',
+                border: '1px solid rgba(16, 185, 129, 0.3)',
+                color: 'var(--color-emerald)',
+                fontSize: '0.76rem',
+                fontWeight: 700,
+                padding: '0.25rem 0.65rem',
+                borderRadius: '20px',
+                cursor: 'pointer'
+              }}
+            >
+              ➕ Add Charge
+            </button>
           </div>
- 
+
+          {additionalCharges.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', marginBottom: '0.75rem' }}>
+              {additionalCharges.map(chg => {
+                const isPreset = PRESET_CHARGES.includes(chg.name);
+                const selectValue = isPreset ? chg.name : 'Other (Custom...)';
+
+                return (
+                  <div key={chg.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', padding: '0.45rem 0.6rem', borderRadius: 'var(--radius-sm)' }}>
+                    <div style={{ display: 'flex', gap: '0.45rem', alignItems: 'center' }}>
+                      <select
+                        className="form-control form-control-sm"
+                        style={{ flex: 1, fontSize: '0.82rem', padding: '0.3rem 0.5rem' }}
+                        value={selectValue}
+                        onChange={e => {
+                          const val = e.target.value;
+                          if (val === 'Other (Custom...)') {
+                            handleUpdateCharge(chg.id, 'name', 'Custom Charge Description');
+                          } else {
+                            handleUpdateCharge(chg.id, 'name', val);
+                          }
+                        }}
+                      >
+                        <option value="Transport">Transport</option>
+                        <option value="Loading">Loading</option>
+                        <option value="Discount">Discount</option>
+                        <option value="Previous Arrears">Previous Arrears</option>
+                        <option value="GST / Tax">GST / Tax</option>
+                        <option value="Packing Fee">Packing Fee</option>
+                        <option value="Handling">Handling</option>
+                        <option value="Other (Custom...)">Other (Custom...)</option>
+                      </select>
+
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        className="form-control form-control-sm"
+                        style={{ width: '100px', fontSize: '0.82rem', padding: '0.3rem 0.5rem', textAlign: 'right' }}
+                        placeholder="0.00"
+                        value={chg.amount || ''}
+                        onChange={e => handleUpdateCharge(chg.id, 'amount', Number(e.target.value))}
+                        onWheel={e => (e.target as HTMLElement).blur()}
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveCharge(chg.id)}
+                        style={{
+                          background: 'rgba(244, 63, 94, 0.1)',
+                          border: '1px solid rgba(244, 63, 94, 0.25)',
+                          color: '#f43f5e',
+                          fontSize: '0.8rem',
+                          fontWeight: 700,
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                        title="Remove Charge"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    {!isPreset && (
+                      <input
+                        type="text"
+                        className="form-control form-control-sm"
+                        style={{ fontSize: '0.8rem', padding: '0.25rem 0.5rem' }}
+                        placeholder="Type custom charge name..."
+                        value={chg.name}
+                        onChange={e => handleUpdateCharge(chg.id, 'name', e.target.value)}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           {(() => {
             const subtotal = eggQty * eggPricePerEgg || 0;
-            const currentInvoiceTotal = subtotal + eggTransport + eggOther;
+            const totalAdd = additionalCharges.reduce((sum, c) => sum + Number(c.amount || 0), 0);
+            const currentInvoiceTotal = subtotal + totalAdd;
             const displayAmountPaid = isEggAmountPaidCustom ? eggAmountPaid : currentInvoiceTotal;
             return (
               <>
@@ -488,20 +619,10 @@ export const EggProduction: React.FC = () => {
                           setIsEggAmountPaidCustom(true);
                           setEggAmountPaid(Number(e.target.value));
                         }}
+                        onWheel={e => (e.target as HTMLElement).blur()}
                         placeholder="Defaults to full invoice total"
                         required
                       />
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        style={{ marginTop: '0.2rem', padding: '0.2rem 0.4rem', fontSize: '0.7rem', width: 'fit-content' }}
-                        onClick={() => {
-                          setIsEggAmountPaidCustom(false);
-                          setEggAmountPaid(currentInvoiceTotal);
-                        }}
-                      >
-                        Reset to Full Amount (Rs {currentInvoiceTotal.toFixed(2)})
-                      </button>
                     </div>
                   </div>
                 )}
@@ -525,47 +646,36 @@ export const EggProduction: React.FC = () => {
                       <span>Subtotal</span>
                       <strong>Rs {subtotal.toFixed(2)}</strong>
                     </div>
-                    {eggTransport > 0 && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
-                        <span>Transport Charges</span>
-                        <strong>+ Rs {eggTransport.toFixed(2)}</strong>
-                      </div>
-                    )}
-                    {eggOther > 0 && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
-                        <span>Other Charges</span>
-                        <strong>+ Rs {eggOther.toFixed(2)}</strong>
-                      </div>
-                    )}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: 'var(--text-secondary)', borderTop: '1px dashed rgba(16,185,129,0.15)' }}>
-                      <span>Current Invoice Billed</span>
+                    {additionalCharges.map(c => {
+                      if (!c.amount || c.amount <= 0) return null;
+                      return (
+                        <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
+                          <span>{c.name}</span>
+                          <strong>+ Rs {c.amount.toFixed(2)}</strong>
+                        </div>
+                      );
+                    })}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.92rem', color: 'var(--text-primary)', fontWeight: 700, borderTop: '1px solid rgba(16,185,129,0.15)', paddingTop: '0.3rem' }}>
+                      <span>Total Invoice Amount</span>
                       <strong>Rs {currentInvoiceTotal.toFixed(2)}</strong>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
-                      <span>Customer Old Balance</span>
-                      <span className={customerOldBalance > 0 ? "color-rose" : ""}>Rs {customerOldBalance.toFixed(2)}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                      <span>Total Net Outstanding</span>
-                      <strong>Rs {(currentInvoiceTotal + customerOldBalance).toFixed(2)}</strong>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: 'var(--color-emerald)', fontWeight: 600 }}>
                       <span>Amount Paid now</span>
                       <strong>Rs {displayAmountPaid.toFixed(2)}</strong>
                     </div>
-                    {((currentInvoiceTotal + customerOldBalance) - displayAmountPaid) !== 0 && (
+                    {(currentInvoiceTotal - displayAmountPaid) !== 0 && (
                       <div style={{
                         display: 'flex',
                         justifyContent: 'space-between',
-                        fontSize: '1rem',
+                        fontSize: '0.95rem',
                         fontWeight: '700',
-                        color: ((currentInvoiceTotal + customerOldBalance) - displayAmountPaid) > 0 ? 'var(--color-rose)' : 'var(--color-emerald)',
-                        borderTop: '1px solid rgba(16,185,129,0.2)',
-                        paddingTop: '0.4rem',
+                        color: (currentInvoiceTotal - displayAmountPaid) > 0 ? 'var(--color-rose)' : 'var(--color-emerald)',
+                        borderTop: '1px dashed rgba(16,185,129,0.2)',
+                        paddingTop: '0.3rem',
                         marginTop: '0.2rem'
                       }}>
-                        <span>{((currentInvoiceTotal + customerOldBalance) - displayAmountPaid) > 0 ? 'Final Net Due' : 'Change/Overpaid'}</span>
-                        <strong>Rs {Math.abs((currentInvoiceTotal + customerOldBalance) - displayAmountPaid).toFixed(2)}</strong>
+                        <span>{(currentInvoiceTotal - displayAmountPaid) > 0 ? 'Balance Due' : 'Change/Overpaid'}</span>
+                        <strong>Rs {Math.abs(currentInvoiceTotal - displayAmountPaid).toFixed(2)}</strong>
                       </div>
                     )}
                   </div>
@@ -628,4 +738,3 @@ export const EggProduction: React.FC = () => {
     </div>
   );
 };
-

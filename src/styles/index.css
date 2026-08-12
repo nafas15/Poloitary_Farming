@@ -518,3 +518,14 @@ tr:hover td {
   html { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 }
 
+/* Disable spin buttons and wheel scroll value mutation on all number inputs so they operate strictly as typing text fields */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type=number] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+

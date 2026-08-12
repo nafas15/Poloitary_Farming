@@ -43,7 +43,7 @@ const getSaleTimestamp = (s: Sale): number => {
 };
 
 export const SalesMgmt: React.FC = () => {
-  const { batches, sales, deleteSale, updateSale, addEggSale } = useFarm();
+  const { batches, sales, usersList, deleteSale, updateSale, addEggSale } = useFarm();
 
   // Paid status (local, persisted to localStorage)
   const [paidIds, setPaidIds] = useState<Set<string>>(loadPaidIds);
@@ -64,6 +64,38 @@ export const SalesMgmt: React.FC = () => {
       ...sale,
       amountPaid: newAmountPaid
     });
+  };
+
+  // Admin Verification for Mark Paid & Payment Updates
+  const [isAdminAuthModalOpen, setIsAdminAuthModalOpen] = useState(false);
+  const [adminPasswordInput, setAdminPasswordInput] = useState('');
+  const [adminAuthError, setAdminAuthError] = useState('');
+  const [pendingPaidSaleId, setPendingPaidSaleId] = useState<string | null>(null);
+
+  const handleInitiateTogglePaid = (saleId: string) => {
+    setPendingPaidSaleId(saleId);
+    setAdminPasswordInput('');
+    setAdminAuthError('');
+    setIsAdminAuthModalOpen(true);
+  };
+
+  const handleVerifyAdminAndExecute = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!pendingPaidSaleId) return;
+
+    const adminUser = usersList.find(u => u.role === 'Admin');
+    const isPasswordCorrect = adminUser ? adminUser.password === adminPasswordInput : (adminPasswordInput === 'admin' || adminPasswordInput === '2001-02-23');
+
+    if (!isPasswordCorrect) {
+      setAdminAuthError('❌ Incorrect Admin Password. Access denied.');
+      return;
+    }
+
+    await togglePaid(pendingPaidSaleId);
+    setIsAdminAuthModalOpen(false);
+    setPendingPaidSaleId(null);
+    setAdminPasswordInput('');
+    setAdminAuthError('');
   };
 
   const [activeTab, setActiveTab] = useState<'ledger' | 'balances'>('ledger');
@@ -103,6 +135,54 @@ export const SalesMgmt: React.FC = () => {
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
   const [paymentDetails, setPaymentDetails] = useState('Cash Payment');
+
+  // Admin auth for Receive Payment
+  const [isPaymentAuthModalOpen, setIsPaymentAuthModalOpen] = useState(false);
+  const [paymentAdminPassword, setPaymentAdminPassword] = useState('');
+  const [paymentAdminError, setPaymentAdminError] = useState('');
+
+  const handleInitiatePayment = () => {
+    setPaymentAdminPassword('');
+    setPaymentAdminError('');
+    setIsPaymentAuthModalOpen(true);
+  };
+
+  const handleVerifyPaymentAdmin = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const adminUser = usersList.find(u => u.role === 'Admin');
+    const ok = adminUser ? adminUser.password === paymentAdminPassword : (paymentAdminPassword === 'admin' || paymentAdminPassword === '2001-02-23');
+    if (!ok) { setPaymentAdminError('❌ Incorrect Admin Password. Access denied.'); return; }
+    setIsPaymentAuthModalOpen(false);
+    setPaymentAdminPassword('');
+    setPaymentAdminError('');
+    // Trigger actual submit
+    const finalCustomer = isNewCustomer ? newCustomerName.trim() : paymentCustomer.trim();
+    if (!finalCustomer || paymentAmount <= 0) return;
+    await addEggSale({
+      date: paymentDate,
+      customerName: finalCustomer,
+      customerContact: paymentContact,
+      quantity: 0,
+      unitPrice: 0,
+      totalAmount: 0,
+      amountPaid: paymentAmount,
+      details: paymentDetails ? `Payment: ${paymentDetails}` : 'Customer Payment Received',
+      transportCharges: 0,
+      otherCharges: 0,
+      oldBalance: 0
+    });
+    setIsPaymentModalOpen(false);
+    setPaymentCustomer('');
+    setIsNewCustomer(false);
+    setNewCustomerName('');
+    setPaymentContact('');
+    setPaymentAmount(0);
+    setPaymentDetails('Cash Payment');
+  };
+
+  // Customer Statement Modal State
+  const [isCustomerStatementOpen, setIsCustomerStatementOpen] = useState(false);
+  const [statementCustomer, setStatementCustomer] = useState<{ name: string; contact: string; billed: number; paid: number } | null>(null);
 
   const handleOpenEditSale = (s: Sale) => {
     setEditingSaleId(s.id);
@@ -161,27 +241,7 @@ export const SalesMgmt: React.FC = () => {
     setIsInvoiceOpen(true);
   };
 
-  const handleSavePayment = async () => {
-    if (!activeInvoice) return;
-    const subtotal = activeInvoice.totalAmount - (activeInvoice.transportCharges || 0) - (activeInvoice.otherCharges || 0);
-    await updateSale(activeInvoice.id, {
-      type: activeInvoice.type,
-      date: activeInvoice.date,
-      customerName: activeInvoice.customerName,
-      customerContact: activeInvoice.customerContact,
-      quantity: activeInvoice.quantity,
-      unitPrice: activeInvoice.unitPrice,
-      totalAmount: subtotal,
-      amountPaid: amountPaid,
-      transportCharges: activeInvoice.transportCharges,
-      otherCharges: activeInvoice.otherCharges,
-      oldBalance: activeInvoice.oldBalance,
-      batchId: activeInvoice.batchId,
-      details: activeInvoice.details,
-      weightKg: activeInvoice.weightKg,
-      pricePerKg: activeInvoice.pricePerKg
-    });
-  };
+
 
   const handlePrint = () => {
     if (!activeInvoice) return;
@@ -543,7 +603,7 @@ export const SalesMgmt: React.FC = () => {
                     <th>Contact Info</th>
                     <th>Total Billed</th>
                     <th>Total Paid</th>
-                    <th>Outstanding Balance</th>
+                    <th>Net Due / Balance</th>
                     <th>Status</th>
                     <th>Actions</th>
                   </tr>
@@ -557,29 +617,42 @@ export const SalesMgmt: React.FC = () => {
                         <td><span className="customer-contact">{c.contact}</span></td>
                         <td>Rs {c.billed.toFixed(2)}</td>
                         <td className="color-emerald">Rs {c.paid.toFixed(2)}</td>
-                        <td className={outstanding > 0 ? "profit-amount-neg" : "profit-amount-pos"} style={{ fontWeight: 'bold' }}>
+                        <td className={outstanding > 0 ? "profit-amount-neg" : "profit-amount-pos"} style={{ fontWeight: 'bold', fontSize: '0.95rem' }}>
                           Rs {outstanding.toFixed(2)}
                         </td>
                         <td>
                           <span className={`sm-type-badge ${outstanding > 0 ? 'type-bird' : 'type-egg'}`} style={{ fontSize: '0.7rem' }}>
-                            {outstanding > 0 ? '⏳ Owes Money' : '✅ Fully Paid'}
+                            {outstanding > 0 ? '⏳ Net Due' : '✅ Fully Paid'}
                           </span>
                         </td>
                         <td>
-                          <button
-                            type="button"
-                            className="btn btn-secondary btn-xs-custom"
-                            onClick={() => {
-                              setIsNewCustomer(false);
-                              setPaymentCustomer(c.name);
-                              setPaymentContact(c.contact === 'N/A' ? '' : c.contact);
-                              setPaymentAmount(outstanding > 0 ? outstanding : 0);
-                              setPaymentDetails('Customer Balance Payment');
-                              setIsPaymentModalOpen(true);
-                            }}
-                          >
-                            💳 Receive Payment
-                          </button>
+                          <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-xs-custom"
+                              onClick={() => {
+                                setStatementCustomer({ name: c.name, contact: c.contact, billed: c.billed, paid: c.paid });
+                                setIsCustomerStatementOpen(true);
+                              }}
+                              title="Print customer ledger invoice statement connected to customer name"
+                            >
+                              🖨️ Print Statement
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-primary btn-xs-custom"
+                              onClick={() => {
+                                setIsNewCustomer(false);
+                                setPaymentCustomer(c.name);
+                                setPaymentContact(c.contact === 'N/A' ? '' : c.contact);
+                                setPaymentAmount(outstanding > 0 ? outstanding : 0);
+                                setPaymentDetails('Customer Balance Payment');
+                                setIsPaymentModalOpen(true);
+                              }}
+                            >
+                              💳 Receive Payment
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -736,10 +809,9 @@ export const SalesMgmt: React.FC = () => {
                                       </span>
                                     )}
                                     <span style={{ fontSize: '0.85rem' }}>Billed: <strong>Rs {s.totalAmount.toFixed(2)}</strong></span>
-                                    <span style={{ fontSize: '0.78rem', color: 'var(--color-emerald)' }}>Paid: Rs {(s.amountPaid ?? 0).toFixed(2)}</span>
                                     {netOutstanding > 0 ? (
                                       <span style={{ fontSize: '0.78rem', color: 'var(--color-rose)', fontWeight: 'bold' }}>
-                                        Net Due: Rs {netOutstanding.toFixed(2)}
+                                        Balance Due: Rs {netOutstanding.toFixed(2)}
                                       </span>
                                     ) : (
                                       <span className="paid-status-badge">✅ Paid</span>
@@ -772,8 +844,8 @@ export const SalesMgmt: React.FC = () => {
                                 <button
                                   type="button"
                                   className={`btn btn-xs-custom ${paidIds.has(s.id) ? 'btn-paid-active' : 'btn-mark-paid'}`}
-                                  onClick={() => togglePaid(s.id)}
-                                  title={paidIds.has(s.id) ? 'Mark as unpaid' : 'Mark as paid'}
+                                  onClick={() => handleInitiateTogglePaid(s.id)}
+                                  title={paidIds.has(s.id) ? 'Mark as unpaid (Admin required)' : 'Mark as paid (Admin required)'}
                                 >
                                   {paidIds.has(s.id) ? '🔄 Unmark' : '✅ Mark Paid'}
                                 </button>
@@ -1029,21 +1101,9 @@ export const SalesMgmt: React.FC = () => {
         onClose={() => setIsInvoiceOpen(false)}
         title={``}
         footer={
-          <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
-            <button
-              className="btn btn-success"
-              type="button"
-              onClick={async () => {
-                await handleSavePayment();
-                alert('Payment updated successfully!');
-              }}
-            >
-              💾 Save Payment
-            </button>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button className="btn btn-secondary" onClick={() => setIsInvoiceOpen(false)}>Close</button>
-              <button className="btn btn-primary" onClick={handlePrint}>🖨️ Print Invoice</button>
-            </div>
+          <div style={{ display: 'flex', width: '100%', justifyContent: 'flex-end', alignItems: 'center', gap: '0.5rem' }}>
+            <button className="btn btn-secondary" onClick={() => setIsInvoiceOpen(false)}>Close</button>
+            <button className="btn btn-primary" onClick={handlePrint}>🖨️ Print Invoice</button>
           </div>
         }
       >
@@ -1069,39 +1129,18 @@ export const SalesMgmt: React.FC = () => {
                 <p><strong>{activeInvoice.customerName}</strong></p>
                 <p className="inv-contact">📞 {activeInvoice.customerContact}</p>
               </div>
-              <div className="address-block invoice-status-block">
-                <h5>Amount Paid (Rs)</h5>
-                <input
-                  id="amountPaidInput"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  className="inv-paid-input inv-paid-input-header"
-                  value={amountPaid}
-                  onChange={e => setAmountPaid(Number(e.target.value))}
-                />
-                <span className="inv-paid-print-value">Rs {amountPaid.toFixed(2)}</span>
-                <div style={{ marginTop: '0.4rem' }}>
-                  {amountPaid >= (activeInvoice?.totalAmount ?? 0) ? (
-                    <span className="paid-badge">✅ PAID IN FULL</span>
-                  ) : (
-                    <span className="partial-badge">⏳ PARTIAL PAYMENT</span>
-                  )}
-                </div>
-              </div>
             </div>
 
-            <table className="invoice-items-table">
-              <thead>
-                <tr>
-                  <th>Description</th>
-                  <th>Quantity</th>
-                  <th>Unit Rate</th>
-                  <th>Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {activeInvoice.totalAmount === 0 ? (
+            {/* Invoice Line Items Table */}
+            {activeInvoice.totalAmount === 0 ? (
+              <table className="invoice-items-table">
+                <thead>
+                  <tr>
+                    <th>Description</th>
+                    <th>Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
                   <tr>
                     <td>
                       <div className="inv-item-desc">Customer Payment Received</div>
@@ -1109,29 +1148,60 @@ export const SalesMgmt: React.FC = () => {
                         <div className="inv-item-note">{activeInvoice.details}</div>
                       )}
                     </td>
-                    <td>—</td>
-                    <td>—</td>
-                    <td><strong>Rs {amountPaid.toFixed(2)}</strong></td>
+                    <td><strong>Rs {(activeInvoice.amountPaid ?? 0).toFixed(2)}</strong></td>
                   </tr>
-                ) : (
+                </tbody>
+              </table>
+            ) : activeInvoice.type === 'Egg' ? (
+              // ── Egg Sale Invoice ──
+              <table className="invoice-items-table">
+                <thead>
+                  <tr>
+                    <th>Description</th>
+                    <th>Qty</th>
+                    <th>Rate (Rs)</th>
+                    <th style={{ textAlign: 'right' }}>Amount (Rs)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* Main Egg Line */}
                   <tr>
                     <td>
-                      <div className="inv-item-desc">
-                        {activeInvoice.type === 'Bird'
-                          ? `Live Poultry Birds (Batch: ${activeInvoice.batchId})`
-                          : 'Fresh Eggs'}
-                      </div>
+                      <div className="inv-item-desc">Fresh Eggs</div>
+                      {activeInvoice.details && (
+                        <div className="inv-item-note">{activeInvoice.details}</div>
+                      )}
+                    </td>
+                    <td>{activeInvoice.quantity.toLocaleString()} eggs</td>
+                    <td>Rs {activeInvoice.unitPrice.toFixed(4)}</td>
+                    <td style={{ textAlign: 'right' }}><strong>Rs {activeInvoice.totalAmount.toFixed(2)}</strong></td>
+                  </tr>
+                </tbody>
+              </table>
+            ) : (
+              // ── Bird Sale Invoice ──
+              <table className="invoice-items-table">
+                <thead>
+                  <tr>
+                    <th>Description</th>
+                    <th>Quantity</th>
+                    <th>Unit Rate</th>
+                    <th>Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      <div className="inv-item-desc">Live Poultry Birds (Batch: {activeInvoice.batchId})</div>
                       {activeInvoice.weightKg && (
-                        <div className="inv-item-note">
-                          Weight-based sale: {activeInvoice.weightKg.toLocaleString()} kg
-                        </div>
+                        <div className="inv-item-note">Weight-based sale: {activeInvoice.weightKg.toLocaleString()} kg</div>
                       )}
                       {activeInvoice.details && (
                         <div className="inv-item-note">{activeInvoice.details}</div>
                       )}
                     </td>
                     <td>
-                      {activeInvoice.quantity.toLocaleString()} {activeInvoice.type === 'Bird' ? 'birds' : 'eggs'}
+                      {activeInvoice.quantity.toLocaleString()} birds
                       {activeInvoice.weightKg && (
                         <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
                           ({activeInvoice.weightKg.toLocaleString()} kg total)
@@ -1152,154 +1222,176 @@ export const SalesMgmt: React.FC = () => {
                     </td>
                     <td><strong>Rs {((activeInvoice.weightKg && activeInvoice.pricePerKg ? activeInvoice.weightKg * activeInvoice.pricePerKg : activeInvoice.quantity * activeInvoice.unitPrice)).toFixed(2)}</strong></td>
                   </tr>
-                )}
-              </tbody>
-            </table>
+                </tbody>
+              </table>
+            )}
 
+            {/* Calculations Summary */}
             <div className="invoice-calculations">
               {activeInvoice.totalAmount === 0 ? (
                 <>
                   <div className="calc-row grand-total">
                     <span>Amount Received:</span>
-                    <span>Rs {amountPaid.toFixed(2)}</span>
+                    <span>Rs {(activeInvoice.amountPaid ?? 0).toFixed(2)}</span>
                   </div>
                 </>
+              ) : activeInvoice.type === 'Egg' ? (
+                // ── Egg Sale Clean Bill Summary ──
+                (() => {
+                  const transport = activeInvoice.transportCharges ?? 0;
+                  const other = activeInvoice.otherCharges ?? 0;
+                  const invoiceTotal = activeInvoice.totalAmount + transport + other;
+                  const paid = activeInvoice.amountPaid ?? 0;
+                  const balanceDue = invoiceTotal - paid;
+                  return (
+                    <>
+                      <div className="calc-row">
+                        <span>Eggs Subtotal:</span>
+                        <span>Rs {activeInvoice.totalAmount.toFixed(2)}</span>
+                      </div>
+                      {transport > 0 && (
+                        <div className="calc-row charge-addition">
+                          <span>+ Transport Charges:</span>
+                          <span className="charge-pos-val">Rs {transport.toFixed(2)}</span>
+                        </div>
+                      )}
+                      {other > 0 && (
+                        <div className="calc-row charge-addition">
+                          <span>+ Other Charges:</span>
+                          <span className="charge-pos-val">Rs {other.toFixed(2)}</span>
+                        </div>
+                      )}
+                      <div className="calc-row grand-total">
+                        <span>Invoice Total:</span>
+                        <span>Rs {invoiceTotal.toFixed(2)}</span>
+                      </div>
+                      <div className="calc-row payment-given-row">
+                        <span>Amount Paid Now:</span>
+                        <span>Rs {paid.toFixed(2)}</span>
+                      </div>
+                      {balanceDue > 0 && (
+                        <div className="calc-row balance-row" style={{ color: '#b91c1c', fontWeight: 800, fontSize: '1.05rem', borderTop: '2px solid #b91c1c', paddingTop: '0.5rem', marginTop: '0.2rem' }}>
+                          <span>Balance Due:</span>
+                          <strong style={{ color: '#b91c1c' }}>Rs {balanceDue.toFixed(2)}</strong>
+                        </div>
+                      )}
+                      {balanceDue < 0 && (
+                        <div className="calc-row balance-row change-positive">
+                          <span>Change / Overpaid:</span>
+                          <strong>Rs {Math.abs(balanceDue).toFixed(2)}</strong>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()
               ) : (
-                <>
-                  {(() => {
-                    const savedTransport = activeInvoice.transportCharges || 0;
-                    const savedOther = activeInvoice.otherCharges || 0;
-                    const subtotal = activeInvoice.totalAmount - savedTransport - savedOther;
-                    const totalExtras = extraCharges.reduce((s, c) => s + c.amount, 0);
-                    const grandTotal = activeInvoice.totalAmount + totalExtras;
-                    const totalToPay = grandTotal + oldBalance;
-                    const change = amountPaid - totalToPay;
-                    return (
-                      <>
-                        <div className="calc-row"><span>Subtotal:</span><span>Rs {subtotal.toFixed(2)}</span></div>
-                        
-                        {savedTransport > 0 && (
-                          <div className="calc-row charge-addition">
-                            <span>+ Transport Charges:</span>
-                            <span className="charge-pos-val">Rs {savedTransport.toFixed(2)}</span>
-                          </div>
-                        )}
-                        {savedOther > 0 && (
-                          <div className="calc-row charge-addition">
-                            <span>+ Other Charges:</span>
-                            <span className="charge-pos-val">Rs {savedOther.toFixed(2)}</span>
-                          </div>
-                        )}
+                // ── Bird Sale Summary ──
+                (() => {
+                  const savedTransport = activeInvoice.transportCharges || 0;
+                  const savedOther = activeInvoice.otherCharges || 0;
+                  const subtotal = activeInvoice.totalAmount - savedTransport - savedOther;
+                  const totalExtras = extraCharges.reduce((s, c) => s + c.amount, 0);
+                  const grandTotal = activeInvoice.totalAmount + totalExtras;
+                  const totalToPay = grandTotal + oldBalance;
+                  const change = amountPaid - totalToPay;
+                  return (
+                    <>
+                      <div className="calc-row"><span>Subtotal:</span><span>Rs {subtotal.toFixed(2)}</span></div>
 
-                        {/* ── Extra Charges ── */}
-                        {extraCharges.map((c, i) => (
-                          <div key={i} className={`calc-row extra-charge-row ${c.amount < 0 ? 'charge-deduction' : 'charge-addition'}`}>
-                            <span>{c.amount < 0 ? '− ' : '+ '}{c.label}:</span>
-                            <span className="extra-charge-right">
-                              <span className={c.amount < 0 ? 'charge-neg-val' : 'charge-pos-val'}>
-                                {c.amount < 0 ? '−' : '+'} Rs {Math.abs(c.amount).toFixed(2)}
-                              </span>
-                              <button
-                                type="button"
-                                className="remove-charge-btn"
-                                onClick={() => {
-                                  const updated = extraCharges.filter((_, idx) => idx !== i);
-                                  setExtraCharges(updated);
-                                }}
-                                title="Remove charge"
-                              >✕</button>
+                      {savedTransport > 0 && (
+                        <div className="calc-row charge-addition">
+                          <span>+ Transport Charges:</span>
+                          <span className="charge-pos-val">Rs {savedTransport.toFixed(2)}</span>
+                        </div>
+                      )}
+                      {savedOther > 0 && (
+                        <div className="calc-row charge-addition">
+                          <span>+ Other Charges:</span>
+                          <span className="charge-pos-val">Rs {savedOther.toFixed(2)}</span>
+                        </div>
+                      )}
+
+                      {extraCharges.map((c, i) => (
+                        <div key={i} className={`calc-row extra-charge-row ${c.amount < 0 ? 'charge-deduction' : 'charge-addition'}`}>
+                          <span>{c.amount < 0 ? '− ' : '+ '}{c.label}:</span>
+                          <span className="extra-charge-right">
+                            <span className={c.amount < 0 ? 'charge-neg-val' : 'charge-pos-val'}>
+                              {c.amount < 0 ? '−' : '+'} Rs {Math.abs(c.amount).toFixed(2)}
                             </span>
-                          </div>
-                        ))}
-
-                        {/* ── Add Charge Row ── */}
-                        <div className="add-charge-row">
-                          <select
-                            className="charge-label-select"
-                            value={newChargeLabel}
-                            onChange={e => setNewChargeLabel(e.target.value)}
-                          >
-                            <option>Transport</option>
-                            <option>Packing</option>
-                            <option>Loading</option>
-                            <option>Handling</option>
-                            <option>Discount</option>
-                            <option>Advance Deduction</option>
-                            <option>Other</option>
-                          </select>
-                          <button
-                            type="button"
-                            className={`charge-sign-toggle ${newChargeAmount < 0 ? 'sign-neg' : 'sign-pos'}`}
-                            title={newChargeAmount < 0 ? 'Currently Deduction. Click to switch' : 'Currently Addition. Click to switch'}
-                            onClick={() => setNewChargeAmount(prev => prev === 0 ? -0.01 : -prev)}
-                          >
-                            {newChargeAmount < 0 ? '−' : '+'}
-                          </button>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            className="charge-amount-input"
-                            placeholder="Amount"
-                            value={newChargeAmount === 0 ? '' : Math.abs(newChargeAmount)}
-                            onChange={e => {
-                              const abs = Math.abs(Number(e.target.value));
-                              setNewChargeAmount(newChargeAmount < 0 ? -abs : abs);
-                            }}
-                          />
-                          <button
-                            type="button"
-                            className="add-charge-btn"
-                            onClick={() => {
-                              if (newChargeAmount !== 0) {
-                                const newCharge = { label: newChargeLabel, amount: newChargeAmount };
-                                setExtraCharges([...extraCharges, newCharge]);
-                                setNewChargeAmount(0);
-                              }
-                            }}
-                          >+ Add</button>
+                            <button
+                              type="button"
+                              className="remove-charge-btn"
+                              onClick={() => {
+                                const updated = extraCharges.filter((_, idx) => idx !== i);
+                                setExtraCharges(updated);
+                              }}
+                              title="Remove charge"
+                            >✕</button>
+                          </span>
                         </div>
+                      ))}
 
-                        <div className="calc-row grand-total"><span>Grand Total:</span><span>Rs {grandTotal.toFixed(2)}</span></div>
-                        
-                        {/* Historical Running Balances */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', width: '100%' }}>
-                          <div className="calc-row" style={{ borderTop: '1px dashed var(--border-color)', paddingTop: '0.4rem', marginTop: '0.2rem' }}>
-                            <span>Old Balance:</span>
-                            <strong>Rs {oldBalance.toFixed(2)}</strong>
-                          </div>
-                          <div className="calc-row" style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>
-                            <span>Current Outstanding Balance:</span>
-                            <strong>Rs {Math.max(0, grandTotal - amountPaid).toFixed(2)}</strong>
-                          </div>
+                      <div className="add-charge-row">
+                        <select className="charge-label-select" value={newChargeLabel} onChange={e => setNewChargeLabel(e.target.value)}>
+                          <option>Transport</option>
+                          <option>Packing</option>
+                          <option>Loading</option>
+                          <option>Handling</option>
+                          <option>Discount</option>
+                          <option>Advance Deduction</option>
+                          <option>Other</option>
+                        </select>
+                        <button type="button" className={`charge-sign-toggle ${newChargeAmount < 0 ? 'sign-neg' : 'sign-pos'}`}
+                          title={newChargeAmount < 0 ? 'Deduction. Click to switch' : 'Addition. Click to switch'}
+                          onClick={() => setNewChargeAmount(prev => prev === 0 ? -0.01 : -prev)}>
+                          {newChargeAmount < 0 ? '−' : '+'}
+                        </button>
+                        <input type="number" step="0.01" min="0" className="charge-amount-input" placeholder="Amount"
+                          value={newChargeAmount === 0 ? '' : Math.abs(newChargeAmount)}
+                          onChange={e => { const abs = Math.abs(Number(e.target.value)); setNewChargeAmount(newChargeAmount < 0 ? -abs : abs); }}
+                        />
+                        <button type="button" className="add-charge-btn"
+                          onClick={() => { if (newChargeAmount !== 0) { setExtraCharges([...extraCharges, { label: newChargeLabel, amount: newChargeAmount }]); setNewChargeAmount(0); } }}>
+                          + Add
+                        </button>
+                      </div>
+
+                      <div className="calc-row grand-total"><span>Grand Total:</span><span>Rs {grandTotal.toFixed(2)}</span></div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', width: '100%' }}>
+                        <div className="calc-row" style={{ borderTop: '1px dashed var(--border-color)', paddingTop: '0.4rem', marginTop: '0.2rem' }}>
+                          <span>Old Balance:</span>
+                          <strong>Rs {oldBalance.toFixed(2)}</strong>
                         </div>
-
-                        {/* Payment row (transaction-specific) */}
-                        <div className="calc-row payment-given-row">
-                          <span>Payment Given:</span>
-                          <span>Rs {amountPaid.toFixed(2)}</span>
+                        <div className="calc-row" style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>
+                          <span>Current Outstanding Balance:</span>
+                          <strong>Rs {Math.max(0, grandTotal - amountPaid).toFixed(2)}</strong>
                         </div>
+                      </div>
 
-                        {/* Dynamic balances including historical */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', width: '100%' }}>
-                          {change >= 0 ? (
-                            change > 0 && (
-                              <div className="calc-row balance-row change-positive">
-                                <span>Change to Return / Credit:</span>
-                                <strong>Rs {change.toFixed(2)}</strong>
-                              </div>
-                            )
-                          ) : (
-                            <div className="calc-row balance-row balance-due" style={{ color: 'var(--color-rose)' }}>
-                              <span>Final Net Due:</span>
-                              <strong>Rs {(-change).toFixed(2)}</strong>
+                      <div className="calc-row payment-given-row">
+                        <span>Payment Given:</span>
+                        <span>Rs {amountPaid.toFixed(2)}</span>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', width: '100%' }}>
+                        {change >= 0 ? (
+                          change > 0 && (
+                            <div className="calc-row balance-row change-positive">
+                              <span>Change to Return / Credit:</span>
+                              <strong>Rs {change.toFixed(2)}</strong>
                             </div>
-                          )}
-                        </div>
-                      </>
-                    );
-                  })()}
-                </>
+                          )
+                        ) : (
+                          <div className="calc-row balance-row balance-due" style={{ color: 'var(--color-rose)' }}>
+                            <span>Final Net Due:</span>
+                            <strong>Rs {(-change).toFixed(2)}</strong>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  );
+                })()
               )}
             </div>
 
@@ -1308,6 +1400,184 @@ export const SalesMgmt: React.FC = () => {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* ── Customer Ledger Statement Printable Modal ── */}
+      <Modal
+        isOpen={isCustomerStatementOpen}
+        onClose={() => setIsCustomerStatementOpen(false)}
+        title={`🖨️ Customer Account Statement: ${statementCustomer?.name || ''}`}
+        footer={
+          <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
+            <button className="btn btn-secondary" onClick={() => setIsCustomerStatementOpen(false)}>Close</button>
+            <button className="btn btn-primary" onClick={handlePrint}>🖨️ Print Statement</button>
+          </div>
+        }
+      >
+        {statementCustomer && (
+          <div className="printable-invoice-container print-invoice">
+            <div className="invoice-header-branding">
+              <div>
+                <h2>AKSHA FARM</h2>
+                <p className="inv-subtitle">Customer Account & Ledger Invoice Statement</p>
+                <p className="inv-address">423/1, Kekunagolla, Kekunagolla | 📞 +94768470361</p>
+              </div>
+              <div className="invoice-id-block">
+                <div className="invoice-label">STATEMENT</div>
+                <div className="invoice-meta-row"><span>Date:</span><strong>{new Date().toISOString().split('T')[0]}</strong></div>
+              </div>
+            </div>
+
+            <div className="invoice-addresses">
+              <div className="address-block">
+                <h5>Billed To / Customer Details</h5>
+                <p><strong>{statementCustomer.name}</strong></p>
+                {statementCustomer.contact && statementCustomer.contact !== 'N/A' && (
+                  <p className="inv-contact">📞 {statementCustomer.contact}</p>
+                )}
+              </div>
+              <div className="address-block invoice-status-block">
+                <h5>Net Balance Due</h5>
+                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: statementCustomer.billed - statementCustomer.paid > 0 ? 'var(--color-rose)' : 'var(--color-emerald)' }}>
+                  Rs {(statementCustomer.billed - statementCustomer.paid).toFixed(2)}
+                </div>
+                <div style={{ marginTop: '0.4rem' }}>
+                  {statementCustomer.billed - statementCustomer.paid > 0 ? (
+                    <span className="partial-badge">⏳ OUTSTANDING NET DUE</span>
+                  ) : (
+                    <span className="paid-badge">✅ FULLY SETTLED</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <h4 style={{ margin: '1.25rem 0 0.5rem 0', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+              Transaction History for {statementCustomer.name}
+            </h4>
+
+            <table className="invoice-items-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Date</th>
+                  <th>Description / Type</th>
+                  <th style={{ textAlign: 'right' }}>Billed (Rs)</th>
+                  <th style={{ textAlign: 'right' }}>Paid (Rs)</th>
+                  <th style={{ textAlign: 'right' }}>Net Due (Rs)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sales
+                  .filter(s => s.customerName.trim().toLowerCase() === statementCustomer.name.trim().toLowerCase())
+                  .sort((a, b) => a.date.localeCompare(b.date))
+                  .map((s, idx) => {
+                    const due = s.totalAmount - (s.amountPaid ?? 0);
+                    return (
+                      <tr key={s.id}>
+                        <td style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{idx + 1}</td>
+                        <td>{s.date}</td>
+                        <td>
+                          {s.totalAmount === 0
+                            ? 'Customer Payment Received'
+                            : `${s.type === 'Bird' ? '🐔 Birds' : '🥚 Eggs'} (${s.quantity.toLocaleString()} qty)`}
+                        </td>
+                        <td style={{ textAlign: 'right' }}>Rs {s.totalAmount.toFixed(2)}</td>
+                        <td style={{ textAlign: 'right', color: 'var(--color-emerald)' }}>Rs {(s.amountPaid ?? 0).toFixed(2)}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 700, color: due > 0 ? 'var(--color-rose)' : 'var(--color-emerald)' }}>
+                          Rs {due.toFixed(2)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+
+            <div className="invoice-calculations" style={{ marginTop: '1.2rem' }}>
+              <div className="calc-row">
+                <span>Total Billed Amount:</span>
+                <span>Rs {statementCustomer.billed.toFixed(2)}</span>
+              </div>
+              <div className="calc-row">
+                <span>Total Amount Paid:</span>
+                <span className="charge-pos-val">Rs {statementCustomer.paid.toFixed(2)}</span>
+              </div>
+              <div className="calc-row grand-total" style={{ borderTop: '2px solid rgba(16,185,129,0.3)', paddingTop: '0.4rem', marginTop: '0.4rem' }}>
+                <span>Final Account Net Due:</span>
+                <strong style={{ color: statementCustomer.billed - statementCustomer.paid > 0 ? 'var(--color-rose)' : 'var(--color-emerald)' }}>
+                  Rs {(statementCustomer.billed - statementCustomer.paid).toFixed(2)}
+                </strong>
+              </div>
+            </div>
+
+            <div className="invoice-footer-notes" style={{ marginTop: '1.5rem', textAlign: 'center' }}>
+              <p>Statement of Account for {statementCustomer.name} · Aksha Farm Management</p>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* ── Admin Password Approval Modal for Mark Paid ── */}
+      <Modal
+        isOpen={isAdminAuthModalOpen}
+        onClose={() => {
+          setIsAdminAuthModalOpen(false);
+          setPendingPaidSaleId(null);
+          setAdminPasswordInput('');
+          setAdminAuthError('');
+        }}
+        title="🔐 Security Verification: Admin Approval Required"
+        footer={
+          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', width: '100%' }}>
+            <button
+              className="btn btn-secondary"
+              type="button"
+              onClick={() => {
+                setIsAdminAuthModalOpen(false);
+                setPendingPaidSaleId(null);
+                setAdminPasswordInput('');
+                setAdminAuthError('');
+              }}
+            >
+              Cancel
+            </button>
+            <button className="btn btn-success" type="button" onClick={handleVerifyAdminAndExecute}>
+              🔑 Verify & Update Payment
+            </button>
+          </div>
+        }
+      >
+        <form onSubmit={handleVerifyAdminAndExecute} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)' }}>
+            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 600 }}>
+              🔒 Admin Password Required
+            </p>
+            <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+              Marking an invoice as paid or updating payment status requires administrator verification.
+            </p>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" style={{ fontWeight: 600 }}>Admin Password</label>
+            <input
+              type="password"
+              className="form-control"
+              placeholder="Enter Admin password..."
+              value={adminPasswordInput}
+              onChange={e => {
+                setAdminPasswordInput(e.target.value);
+                setAdminAuthError('');
+              }}
+              autoFocus
+              required
+            />
+          </div>
+
+          {adminAuthError && (
+            <div style={{ color: 'var(--color-rose)', fontSize: '0.82rem', fontWeight: 600 }}>
+              {adminAuthError}
+            </div>
+          )}
+        </form>
       </Modal>
 
       <style>{`
@@ -1662,7 +1932,7 @@ export const SalesMgmt: React.FC = () => {
         footer={
           <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', width: '100%' }}>
             <button className="btn btn-secondary" type="button" onClick={() => setIsPaymentModalOpen(false)}>Cancel</button>
-            <button className="btn btn-success" type="button" onClick={handlePaymentSubmit}>Record Payment</button>
+            <button className="btn btn-success" type="button" onClick={handleInitiatePayment}>Record Payment</button>
           </div>
         }
       >
@@ -1772,6 +2042,66 @@ export const SalesMgmt: React.FC = () => {
               onChange={e => setPaymentDetails(e.target.value)} 
             />
           </div>
+        </form>
+      </Modal>
+
+      {/* ── Admin Password Verification Modal for Receive Payment ── */}
+      <Modal
+        isOpen={isPaymentAuthModalOpen}
+        onClose={() => {
+          setIsPaymentAuthModalOpen(false);
+          setPaymentAdminPassword('');
+          setPaymentAdminError('');
+        }}
+        title="🔐 Admin Approval Required: Record Payment"
+        footer={
+          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', width: '100%' }}>
+            <button
+              className="btn btn-secondary"
+              type="button"
+              onClick={() => {
+                setIsPaymentAuthModalOpen(false);
+                setPaymentAdminPassword('');
+                setPaymentAdminError('');
+              }}
+            >
+              Cancel
+            </button>
+            <button className="btn btn-success" type="button" onClick={() => handleVerifyPaymentAdmin()}>
+              🔑 Verify & Record
+            </button>
+          </div>
+        }
+      >
+        <form onSubmit={handleVerifyPaymentAdmin} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)' }}>
+            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 600 }}>
+              🔒 Admin Password Required
+            </p>
+            <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+              Recording a customer payment requires administrator verification.
+            </p>
+          </div>
+          <div className="form-group">
+            <label className="form-label" style={{ fontWeight: 600 }}>Admin Password</label>
+            <input
+              type="password"
+              className="form-control"
+              placeholder="Enter Admin password..."
+              value={paymentAdminPassword}
+              onChange={e => {
+                setPaymentAdminPassword(e.target.value);
+                setPaymentAdminError('');
+              }}
+              autoFocus
+              required
+            />
+          </div>
+          {paymentAdminError && (
+            <div style={{ color: 'var(--color-rose)', fontSize: '0.82rem', fontWeight: 600 }}>
+              {paymentAdminError}
+            </div>
+          )}
         </form>
       </Modal>
     </div>

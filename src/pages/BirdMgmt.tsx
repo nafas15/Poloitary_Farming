@@ -4,21 +4,21 @@ import type { BirdType } from '../context/FarmContext';
 import { Modal } from '../components/Modal';
 
 export const BirdMgmt: React.FC = () => {
-  const { 
-    batches, 
-    addBatch, 
-    logMortality, 
+  const {
+    batches,
+    addBatch,
+    logMortality,
     updateMortalityLog,
     deleteMortalityLog,
-    deleteBatch, 
-    sellBatch, 
-    sales, 
-    updateBatch 
+    deleteBatch,
+    sellBatch,
+    sales,
+    updateBatch
   } = useFarm();
-  
+
   // Tab Filter ('All' | 'Broiler' | 'Layer' | 'Archived' | 'MortalityAudit')
   const [filter, setFilter] = useState<'All' | 'Broiler' | 'Layer' | 'Archived' | 'MortalityAudit'>('All');
-  
+
   // Modals Open State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isSellModalOpen, setIsSellModalOpen] = useState(false);
@@ -131,8 +131,28 @@ export const BirdMgmt: React.FC = () => {
   const [sellContact, setSellContact] = useState('');
   const [sellAmountPaid, setSellAmountPaid] = useState<number>(0);
   const [isSellAmountPaidCustom, setIsSellAmountPaidCustom] = useState<boolean>(false);
-  const [sellTransport, setSellTransport] = useState<number>(0);
-  const [sellOther, setSellOther] = useState<number>(0);
+  const [_sellTransport] = useState<number>(0);
+  const [_sellOther] = useState<number>(0);
+
+  // Dynamic Additional Charges for Bird Sale
+  const [additionalCharges, setAdditionalCharges] = useState<{ id: string; name: string; amount: number }[]>([]);
+
+  const handleAddCharge = () => {
+    setAdditionalCharges(prev => [
+      ...prev,
+      { id: `chg-${Date.now()}`, name: 'Transport', amount: 0 }
+    ]);
+  };
+
+  const handleUpdateCharge = (id: string, field: 'name' | 'amount', value: any) => {
+    setAdditionalCharges(prev =>
+      prev.map(c => (c.id === id ? { ...c, [field]: value } : c))
+    );
+  };
+
+  const handleRemoveCharge = (id: string) => {
+    setAdditionalCharges(prev => prev.filter(c => c.id !== id));
+  };
 
   // Form Fields - Log Mortality
   const [mortalityQty, setMortalityQty] = useState<number>(1);
@@ -200,25 +220,33 @@ export const BirdMgmt: React.FC = () => {
     }
 
     const isBroiler = batch?.type === 'Broiler';
-    const subtotal = isBroiler 
+    const subtotal = isBroiler
       ? Number(sellWeightKg) * Number(sellPricePerKg)
       : Number(sellQty) * Number(sellUnitPrice);
-      
-    const computedTotal = subtotal + sellTransport + sellOther;
+
+    const computedTransport = additionalCharges
+      .filter(c => c.name.toLowerCase().includes('transport') || c.name.toLowerCase().includes('freight'))
+      .reduce((sum, c) => sum + Number(c.amount || 0), 0);
+
+    const computedOther = additionalCharges
+      .filter(c => !c.name.toLowerCase().includes('transport') && !c.name.toLowerCase().includes('freight'))
+      .reduce((sum, c) => sum + Number(c.amount || 0), 0);
+
+    const computedTotal = subtotal + computedTransport + computedOther;
     const finalPaid = isSellAmountPaidCustom ? sellAmountPaid : computedTotal;
 
     sellBatch(
-      sellBatchId, 
-      sellQty, 
-      isBroiler ? subtotal / sellQty : sellUnitPrice, 
-      sellCustomer, 
+      sellBatchId,
+      sellQty,
+      isBroiler ? subtotal / sellQty : sellUnitPrice,
+      sellCustomer,
       sellContact,
       isBroiler ? sellWeightKg : undefined,
       isBroiler ? sellPricePerKg : undefined,
       subtotal,
       finalPaid,
-      sellTransport,
-      sellOther,
+      computedTransport,
+      computedOther,
       customerOldBalance
     );
 
@@ -233,8 +261,7 @@ export const BirdMgmt: React.FC = () => {
     setSellContact('');
     setSellAmountPaid(0);
     setIsSellAmountPaidCustom(false);
-    setSellTransport(0);
-    setSellOther(0);
+    setAdditionalCharges([]);
   };
 
   // Dynamically compute the customer's outstanding balance
@@ -328,8 +355,7 @@ export const BirdMgmt: React.FC = () => {
               setSellPricePerKg(0);
               setSellCustomer('');
               setSellContact('');
-              setSellTransport(0);
-              setSellOther(0);
+              setAdditionalCharges([]);
               setIsSellModalOpen(true);
             }}
           >
@@ -388,7 +414,7 @@ export const BirdMgmt: React.FC = () => {
                         <td><b>{calculateAgeDays(batch.arrivalDate)} days</b></td>
                         <td>{batch.initialQuantity.toLocaleString()}</td>
                         <td>
-                          {batch.type === 'Broiler' && batch.initialQuantityKg 
+                          {batch.type === 'Broiler' && batch.initialQuantityKg
                             ? `${batch.initialQuantityKg.toLocaleString()} kg @ Rs ${batch.purchasePricePerKg?.toFixed(2)}/kg`
                             : `Rs ${batch.purchasePrice.toFixed(2)} / bird`}
                         </td>
@@ -418,8 +444,7 @@ export const BirdMgmt: React.FC = () => {
                                 setSellPricePerKg(0);
                                 setSellCustomer('');
                                 setSellContact('');
-                                setSellTransport(0);
-                                setSellOther(0);
+                                setAdditionalCharges([]);
                                 setIsSellModalOpen(true);
                               }}
                             >
@@ -697,7 +722,7 @@ export const BirdMgmt: React.FC = () => {
           )}
         </form>
       </Modal>
-  
+
       {/* Edit Bird Batch Modal */}
       <Modal
         isOpen={isEditModalOpen}
@@ -734,7 +759,7 @@ export const BirdMgmt: React.FC = () => {
               disabled
             />
           </div>
-  
+
           <div className="form-group">
             <label className="form-label">Bird Type</label>
             <select
@@ -746,7 +771,7 @@ export const BirdMgmt: React.FC = () => {
               <option value="Layer">Layer (Eggs)</option>
             </select>
           </div>
-  
+
           <div className="form-row">
             <div className="form-group">
               <label className="form-label">Arrival Date</label>
@@ -770,7 +795,7 @@ export const BirdMgmt: React.FC = () => {
               />
             </div>
           </div>
-  
+
           {editType === 'Broiler' ? (
             <div className="form-row">
               <div className="form-group">
@@ -940,8 +965,9 @@ export const BirdMgmt: React.FC = () => {
               <label className="form-label">Customer Name</label>
               <input
                 type="text"
+                list="bird-customer-list"
                 className="form-control"
-                placeholder="e.g. Fresh Meats Co."
+                placeholder="Type to search customers..."
                 value={sellCustomer}
                 onChange={e => {
                   setSellCustomer(e.target.value);
@@ -953,6 +979,11 @@ export const BirdMgmt: React.FC = () => {
                 maxLength={128}
                 required
               />
+              <datalist id="bird-customer-list">
+                {Array.from(new Set(sales.map(s => s.customerName))).map(name => (
+                  <option key={name} value={name} />
+                ))}
+              </datalist>
               {customerOldBalance > 0 && (
                 <span style={{ fontSize: '0.78rem', color: 'var(--color-rose)', fontWeight: 'bold', marginTop: '0.2rem', display: 'block' }}>
                   ⚠️ Outstanding Balance: Rs {customerOldBalance.toFixed(2)}
@@ -973,43 +1004,137 @@ export const BirdMgmt: React.FC = () => {
             </div>
           </div>
 
+          {/* Dynamic Additional Charges & Adjustments List */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.75rem', marginBottom: '0.4rem' }}>
+            <label className="form-label" style={{ margin: 0, fontWeight: 700, fontSize: '0.83rem' }}>
+              Additional Charges & Adjustments
+            </label>
+            <button
+              type="button"
+              className="btn-nice-outline"
+              onClick={handleAddCharge}
+              style={{
+                background: 'rgba(16, 185, 129, 0.08)',
+                border: '1px solid rgba(16, 185, 129, 0.3)',
+                color: 'var(--color-emerald)',
+                fontSize: '0.76rem',
+                fontWeight: 700,
+                padding: '0.25rem 0.65rem',
+                borderRadius: '20px',
+                cursor: 'pointer'
+              }}
+            >
+              ➕ Add Charge
+            </button>
+          </div>
+
+          {additionalCharges.length === 0 ? (
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '0 0 0.5rem 0', fontStyle: 'italic' }}>
+              No extra charges added. Click "+ Add Charge" to add transport, loading, or packing fees.
+            </p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', marginBottom: '0.75rem' }}>
+              {additionalCharges.map(chg => {
+                const PRESET_LIST = [
+                  'Transport',
+                  'Loading',
+                  'Discount',
+                  'Previous Arrears',
+                  'GST / Tax',
+                  'Packing Fee',
+                  'Handling'
+                ];
+                const isPreset = PRESET_LIST.includes(chg.name);
+                const selectValue = isPreset ? chg.name : 'Other (Custom...)';
+
+                return (
+                  <div key={chg.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', padding: '0.45rem 0.6rem', borderRadius: 'var(--radius-sm)' }}>
+                    <div style={{ display: 'flex', gap: '0.45rem', alignItems: 'center' }}>
+                      <select
+                        className="form-control form-control-sm"
+                        style={{ flex: 1, fontSize: '0.82rem', padding: '0.3rem 0.5rem' }}
+                        value={selectValue}
+                        onChange={e => {
+                          const val = e.target.value;
+                          if (val === 'Other (Custom...)') {
+                            handleUpdateCharge(chg.id, 'name', 'Custom Charge Description');
+                          } else {
+                            handleUpdateCharge(chg.id, 'name', val);
+                          }
+                        }}
+                      >
+                        <option value="Transport">Transport</option>
+                        <option value="Loading">Loading</option>
+                        <option value="Discount">Discount</option>
+                        <option value="Previous Arrears">Previous Arrears</option>
+                        <option value="GST / Tax">GST / Tax</option>
+                        <option value="Packing Fee">Packing Fee</option>
+                        <option value="Handling">Handling</option>
+                        <option value="Other (Custom...)">Other (Custom...)</option>
+                      </select>
+
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        className="form-control form-control-sm"
+                        style={{ width: '100px', fontSize: '0.82rem', padding: '0.3rem 0.5rem', textAlign: 'right' }}
+                        placeholder="0.00"
+                        value={chg.amount || ''}
+                        onChange={e => handleUpdateCharge(chg.id, 'amount', Number(e.target.value))}
+                        onWheel={e => (e.target as HTMLElement).blur()}
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveCharge(chg.id)}
+                        style={{
+                          background: 'rgba(244, 63, 94, 0.1)',
+                          border: '1px solid rgba(244, 63, 94, 0.25)',
+                          color: '#f43f5e',
+                          fontSize: '0.8rem',
+                          fontWeight: 700,
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                        title="Remove Charge"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    {!isPreset && (
+                      <input
+                        type="text"
+                        className="form-control form-control-sm"
+                        style={{ fontSize: '0.8rem', padding: '0.25rem 0.5rem' }}
+                        placeholder="Type custom charge name..."
+                        value={chg.name}
+                        onChange={e => handleUpdateCharge(chg.id, 'name', e.target.value)}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           {(() => {
             const subtotal = selectedSellBatch?.type === 'Broiler'
               ? (sellWeightKg * sellPricePerKg || 0)
               : (sellQty * sellUnitPrice || 0);
-            const currentInvoiceTotal = subtotal + sellTransport + sellOther;
+            const totalAdd = additionalCharges.reduce((sum, c) => sum + Number(c.amount || 0), 0);
+            const currentInvoiceTotal = subtotal + totalAdd;
             const displayAmountPaid = isSellAmountPaidCustom ? sellAmountPaid : currentInvoiceTotal;
             return (
               <>
                 {sellQty > 0 && (selectedSellBatch?.type === 'Broiler' ? (sellWeightKg > 0 && sellPricePerKg > 0) : (sellUnitPrice > 0)) && (
                   <>
-                    <div className="form-row">
-                      <div className="form-group">
-                        <label className="form-label">Transport Charges (Rs)</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          className="form-control"
-                          value={sellTransport || ''}
-                          onChange={e => setSellTransport(Number(e.target.value))}
-                          placeholder="0.00"
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label">Other Charges (Rs)</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          className="form-control"
-                          value={sellOther || ''}
-                          onChange={e => setSellOther(Number(e.target.value))}
-                          placeholder="0.00"
-                        />
-                      </div>
-                    </div>
-
                     <div className="form-row" style={{ marginTop: '0.5rem', marginBottom: '0.5rem' }}>
                       <div className="form-group">
                         <label className="form-label">Amount Paid now (Rs)</label>
@@ -1023,25 +1148,15 @@ export const BirdMgmt: React.FC = () => {
                             setIsSellAmountPaidCustom(true);
                             setSellAmountPaid(Number(e.target.value));
                           }}
+                          onWheel={e => (e.target as HTMLElement).blur()}
                           placeholder="Defaults to full invoice total"
                           required
                         />
-                        <button
-                          type="button"
-                          className="btn btn-secondary btn-xs-custom"
-                          style={{ marginTop: '0.2rem', padding: '0.2rem 0.4rem', fontSize: '0.7rem', width: 'fit-content' }}
-                          onClick={() => {
-                            setIsSellAmountPaidCustom(false);
-                            setSellAmountPaid(currentInvoiceTotal);
-                          }}
-                        >
-                          Reset to Full Amount (Rs {currentInvoiceTotal.toFixed(2)})
-                        </button>
                       </div>
                     </div>
                   </>
                 )}
-                
+
                 {sellQty > 0 && (selectedSellBatch?.type === 'Broiler' ? (sellWeightKg > 0 && sellPricePerKg > 0) : (sellUnitPrice > 0)) && (
                   <div className="sell-summary-preview">
                     <div className="sell-summary-row">
@@ -1068,39 +1183,28 @@ export const BirdMgmt: React.FC = () => {
                       <span>Subtotal</span>
                       <strong>Rs {subtotal.toFixed(2)}</strong>
                     </div>
-                    {sellTransport > 0 && (
-                      <div className="sell-summary-row">
-                        <span>Transport Charges</span>
-                        <strong>+ Rs {sellTransport.toFixed(2)}</strong>
-                      </div>
-                    )}
-                    {sellOther > 0 && (
-                      <div className="sell-summary-row">
-                        <span>Other Charges</span>
-                        <strong>+ Rs {sellOther.toFixed(2)}</strong>
-                      </div>
-                    )}
-                    <div className="sell-summary-row" style={{ borderTop: '1px dashed rgba(16,185,129,0.15)' }}>
-                      <span>Current Invoice Billed</span>
+                    {additionalCharges.map(c => {
+                      if (!c.amount || c.amount <= 0) return null;
+                      return (
+                        <div key={c.id} className="sell-summary-row">
+                          <span>{c.name}</span>
+                          <strong>+ Rs {c.amount.toFixed(2)}</strong>
+                        </div>
+                      );
+                    })}
+                    <div className="sell-summary-row" style={{ borderTop: '1px solid rgba(16,185,129,0.2)', fontWeight: 700, fontSize: '0.92rem' }}>
+                      <span>Total Invoice Amount</span>
                       <strong>Rs {currentInvoiceTotal.toFixed(2)}</strong>
                     </div>
-                    <div className="sell-summary-row">
-                      <span>Customer Old Balance</span>
-                      <span className={customerOldBalance > 0 ? "color-rose" : ""}>Rs {customerOldBalance.toFixed(2)}</span>
-                    </div>
-                    <div className="sell-summary-row" style={{ borderTop: '1px dashed rgba(16,185,129,0.2)', paddingTop: '0.3rem', marginTop: '0.1rem', fontWeight: 600 }}>
-                      <span>Total Net Outstanding</span>
-                      <strong>Rs {(currentInvoiceTotal + customerOldBalance).toFixed(2)}</strong>
-                    </div>
-                    <div className="sell-summary-row" style={{ color: 'var(--color-emerald)' }}>
+                    <div className="sell-summary-row" style={{ color: 'var(--color-emerald)', fontWeight: 600 }}>
                       <span>Amount Paid now</span>
                       <strong>Rs {displayAmountPaid.toFixed(2)}</strong>
                     </div>
-                    {((currentInvoiceTotal + customerOldBalance) - displayAmountPaid) !== 0 && (
-                      <div className="sell-summary-row sell-summary-total" style={{ borderTop: '1px solid rgba(16,185,129,0.3)' }}>
-                        <span>{((currentInvoiceTotal + customerOldBalance) - displayAmountPaid) > 0 ? 'Final Net Due' : 'Change/Overpaid'}</span>
-                        <strong className={((currentInvoiceTotal + customerOldBalance) - displayAmountPaid) > 0 ? "color-rose" : "color-emerald"}>
-                          Rs {Math.abs((currentInvoiceTotal + customerOldBalance) - displayAmountPaid).toFixed(2)}
+                    {(currentInvoiceTotal - displayAmountPaid) !== 0 && (
+                      <div className="sell-summary-row sell-summary-total" style={{ borderTop: '1px dashed rgba(16,185,129,0.3)' }}>
+                        <span>{(currentInvoiceTotal - displayAmountPaid) > 0 ? 'Balance Due' : 'Change/Overpaid'}</span>
+                        <strong className={(currentInvoiceTotal - displayAmountPaid) > 0 ? "color-rose" : "color-emerald"}>
+                          Rs {Math.abs(currentInvoiceTotal - displayAmountPaid).toFixed(2)}
                         </strong>
                       </div>
                     )}

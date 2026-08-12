@@ -1,9 +1,42 @@
 import React, { useState } from 'react';
 import { useFarm } from '../context/FarmContext';
+import { Modal } from '../components/Modal';
 
 export const EmployeeMgmt: React.FC = () => {
   const { usersList, approveUser, updateUserRole, deleteUser, currentUser } = useFarm();
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Admin Verification for Role Switch
+  const [isAdminAuthModalOpen, setIsAdminAuthModalOpen] = useState(false);
+  const [adminPasswordInput, setAdminPasswordInput] = useState('');
+  const [adminAuthError, setAdminAuthError] = useState('');
+  const [roleSwitchTarget, setRoleSwitchTarget] = useState<{ username: string; targetRole: 'Admin' | 'Employee' } | null>(null);
+
+  const handleInitiateRoleSwitch = (username: string, targetRole: 'Admin' | 'Employee') => {
+    setRoleSwitchTarget({ username, targetRole });
+    setAdminPasswordInput('');
+    setAdminAuthError('');
+    setIsAdminAuthModalOpen(true);
+  };
+
+  const handleVerifyAndSwitchRole = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!roleSwitchTarget) return;
+
+    const adminUser = usersList.find(u => u.role === 'Admin');
+    const isPasswordCorrect = adminUser ? adminUser.password === adminPasswordInput : (adminPasswordInput === 'admin' || adminPasswordInput === '2001-02-23');
+
+    if (!isPasswordCorrect) {
+      setAdminAuthError('❌ Incorrect Admin Password. Access denied.');
+      return;
+    }
+
+    updateUserRole(roleSwitchTarget.username, roleSwitchTarget.targetRole);
+    setIsAdminAuthModalOpen(false);
+    setRoleSwitchTarget(null);
+    setAdminPasswordInput('');
+    setAdminAuthError('');
+  };
 
   // Statistics
   const totalUsers = usersList.length;
@@ -81,7 +114,6 @@ export const EmployeeMgmt: React.FC = () => {
               <thead>
                 <tr>
                   <th>Employee Details</th>
-                  <th>Date of Birth</th>
                   <th>Requested Role</th>
                   <th>Status</th>
                   <th style={{ textAlign: 'right' }}>Actions</th>
@@ -100,9 +132,6 @@ export const EmployeeMgmt: React.FC = () => {
                           <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>@{user.username}</span>
                         </div>
                       </div>
-                    </td>
-                    <td>
-                      <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>{user.dob || 'Not provided'}</span>
                     </td>
                     <td>
                       <span className={`role-badge ${user.role.toLowerCase()}`}>
@@ -169,7 +198,6 @@ export const EmployeeMgmt: React.FC = () => {
               <thead>
                 <tr>
                   <th>Employee Details</th>
-                  <th>Date of Birth</th>
                   <th>Role</th>
                   <th>Status</th>
                   <th style={{ textAlign: 'right' }}>Actions</th>
@@ -192,9 +220,6 @@ export const EmployeeMgmt: React.FC = () => {
                         </div>
                       </td>
                       <td>
-                        <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>{user.dob || 'Not provided'}</span>
-                      </td>
-                      <td>
                         <span className={`role-badge ${user.role.toLowerCase()}`}>
                           {user.role}
                         </span>
@@ -206,9 +231,9 @@ export const EmployeeMgmt: React.FC = () => {
                         <div className="actions-cell">
                           <button
                             className="btn-action toggle-role"
-                            onClick={() => updateUserRole(user.username, user.role === 'Admin' ? 'Employee' : 'Admin')}
+                            onClick={() => handleInitiateRoleSwitch(user.username, user.role === 'Admin' ? 'Employee' : 'Admin')}
                             disabled={isSelf}
-                            title="Toggle Access Role"
+                            title="Switch user role (Requires Admin Password)"
                           >
                             🔄 Switch to {user.role === 'Admin' ? 'Employee' : 'Admin'}
                           </button>
@@ -234,6 +259,70 @@ export const EmployeeMgmt: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* ── Admin Password Approval Modal for Switching Roles ── */}
+      <Modal
+        isOpen={isAdminAuthModalOpen}
+        onClose={() => {
+          setIsAdminAuthModalOpen(false);
+          setRoleSwitchTarget(null);
+          setAdminPasswordInput('');
+          setAdminAuthError('');
+        }}
+        title="🔐 Security Verification: Admin Approval Required"
+        footer={
+          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', width: '100%' }}>
+            <button
+              className="btn btn-secondary"
+              type="button"
+              onClick={() => {
+                setIsAdminAuthModalOpen(false);
+                setRoleSwitchTarget(null);
+                setAdminPasswordInput('');
+                setAdminAuthError('');
+              }}
+            >
+              Cancel
+            </button>
+            <button className="btn btn-primary" type="button" onClick={handleVerifyAndSwitchRole}>
+              🔑 Verify & Switch Role
+            </button>
+          </div>
+        }
+      >
+        <form onSubmit={handleVerifyAndSwitchRole} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)' }}>
+            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 600 }}>
+              🔒 Admin Password Required
+            </p>
+            <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+              Changing @{roleSwitchTarget?.username}'s access role to <strong>{roleSwitchTarget?.targetRole}</strong> requires administrator authorization.
+            </p>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" style={{ fontWeight: 600 }}>Admin Password</label>
+            <input
+              type="password"
+              className="form-control"
+              placeholder="Enter Admin password..."
+              value={adminPasswordInput}
+              onChange={e => {
+                setAdminPasswordInput(e.target.value);
+                setAdminAuthError('');
+              }}
+              autoFocus
+              required
+            />
+          </div>
+
+          {adminAuthError && (
+            <div style={{ color: 'var(--color-rose)', fontSize: '0.82rem', fontWeight: 600 }}>
+              {adminAuthError}
+            </div>
+          )}
+        </form>
+      </Modal>
 
       <style>{`
         .employee-page {
