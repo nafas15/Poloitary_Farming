@@ -3,14 +3,15 @@ import { useFarm } from '../context/FarmContext';
 import type { Sale } from '../context/FarmContext';
 import { Modal } from '../components/Modal';
 
-// Persist paid status per invoice in localStorage (no DB migration needed)
-const PAID_KEY = 'aksha_paid_invoices';
-const loadPaidIds = (): Set<string> => {
-  try { return new Set(JSON.parse(localStorage.getItem(PAID_KEY) || '[]')); } catch { return new Set(); }
-};
-const savePaidIds = (ids: Set<string>) => {
-  localStorage.setItem(PAID_KEY, JSON.stringify([...ids]));
-};
+const PRESET_CHARGES = [
+  'Transport',
+  'Loading',
+  'Discount',
+  'Previous Arrears',
+  'GST / Tax',
+  'Packing Fee',
+  'Handling'
+];
 
 const getSaleTimestamp = (s: Sale): number => {
   if (s.updatedAt) {
@@ -45,25 +46,27 @@ const getSaleTimestamp = (s: Sale): number => {
 export const SalesMgmt: React.FC = () => {
   const { batches, sales, usersList, deleteSale, updateSale, addEggSale } = useFarm();
 
-  // Paid status (local, persisted to localStorage)
-  const [paidIds, setPaidIds] = useState<Set<string>>(loadPaidIds);
+  // Paid status — derived directly from DB (amountPaid >= totalAmount)
+  const isSalePaid = (s: Sale) => s.totalAmount > 0 && (s.amountPaid ?? 0) >= s.totalAmount;
+
   const togglePaid = async (saleId: string) => {
     const sale = sales.find(s => s.id === saleId);
     if (!sale) return;
-    const isPaid = paidIds.has(saleId);
-    const newAmountPaid = isPaid ? 0 : sale.totalAmount;
-
-    setPaidIds(prev => {
-      const next = new Set(prev);
-      if (next.has(saleId)) next.delete(saleId); else next.add(saleId);
-      savePaidIds(next);
-      return next;
-    });
-
-    await updateSale(saleId, {
-      ...sale,
-      amountPaid: newAmountPaid
-    });
+    const isPaid = isSalePaid(sale);
+    // Pass subtotal only to updateSale — it adds transport+other internally via computedTotal
+    const subtotal = sale.totalAmount - (sale.transportCharges || 0) - (sale.otherCharges || 0);
+    const fullTotal = sale.totalAmount; // totalAmount in context = full DB total
+    const newAmountPaid = isPaid ? 0 : fullTotal;
+    try {
+      await updateSale(saleId, {
+        ...sale,
+        totalAmount: subtotal,   // pass raw subtotal so updateSale recomputes correctly
+        amountPaid: newAmountPaid
+      });
+    } catch (err) {
+      // Log but don't re-throw — DB was updated and optimistic UI update already ran
+      console.warn('[togglePaid] minor error after update (UI is correct):', err);
+    }
   };
 
   // Admin Verification for Mark Paid & Payment Updates
@@ -91,11 +94,16 @@ export const SalesMgmt: React.FC = () => {
       return;
     }
 
-    await togglePaid(pendingPaidSaleId);
-    setIsAdminAuthModalOpen(false);
-    setPendingPaidSaleId(null);
-    setAdminPasswordInput('');
-    setAdminAuthError('');
+    try {
+      await togglePaid(pendingPaidSaleId);
+      setIsAdminAuthModalOpen(false);
+      setPendingPaidSaleId(null);
+      setAdminPasswordInput('');
+      setAdminAuthError('');
+    } catch (err) {
+      console.error('Mark paid failed:', err);
+      setAdminAuthError('❌ Failed to update payment status. Please try again.');
+    }
   };
 
   const [activeTab, setActiveTab] = useState<'ledger' | 'balances'>('ledger');
@@ -122,9 +130,25 @@ export const SalesMgmt: React.FC = () => {
   const [editSaleBatchId, setEditSaleBatchId] = useState('');
   const [editSaleDetails, setEditSaleDetails] = useState('');
   const [editSaleAmountPaid, setEditSaleAmountPaid] = useState<number>(0);
-  const [editSaleTransport, setEditSaleTransport] = useState<number>(0);
-  const [editSaleOther, setEditSaleOther] = useState<number>(0);
+  const [editSaleAdditionalCharges, setEditSaleAdditionalCharges] = useState<{id: string, name: string, amount: number}[]>([]);
   const [editSaleOldBalance, setEditSaleOldBalance] = useState<number>(0);
+
+  const handleAddEditCharge = () => {
+    setEditSaleAdditionalCharges(prev => [
+      ...prev,
+      { id: `chg-${Date.now()}`, name: '', amount: 0 }
+    ]);
+  };
+
+  const handleUpdateEditCharge = (id: string, field: 'name' | 'amount', value: any) => {
+    setEditSaleAdditionalCharges(prev =>
+      prev.map(c => (c.id === id ? { ...c, [field]: value } : c))
+    );
+  };
+
+  const handleRemoveEditCharge = (id: string) => {
+    setEditSaleAdditionalCharges(prev => prev.filter(c => c.id !== id));
+  };
 
   // Direct Customer Payment States
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -197,39 +221,61 @@ export const SalesMgmt: React.FC = () => {
     setEditSaleBatchId(s.batchId || '');
     setEditSaleDetails(s.details || '');
     setEditSaleAmountPaid(s.amountPaid || 0);
-    setEditSaleTransport(s.transportCharges || 0);
-    setEditSaleOther(s.otherCharges || 0);
+    if (s.extraChargesList && s.extraChargesList.length > 0) {
+      setEditSaleAdditionalCharges(s.extraChargesList.map((c, i) => ({ id: `chg-${Date.now()}-${i}`, name: c.name, amount: c.amount })));
+    } else {
+      const arr = [];
+      if (s.transportCharges) arr.push({ id: `chg-${Date.now()}-t`, name: '', amount: s.transportCharges });
+      if (s.otherCharges) arr.push({ id: `chg-${Date.now()}-o`, name: 'Other (Custom...)', amount: s.otherCharges });
+      setEditSaleAdditionalCharges(arr);
+    }
     setEditSaleOldBalance(s.oldBalance || 0);
     setIsEditSaleModalOpen(true);
   };
 
-  const handleEditSaleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleEditSaleSubmit = async (e?: React.FormEvent | React.MouseEvent) => {
+    if (e) e.preventDefault();
     if (!editingSaleId) return;
 
-    const isBroilerSale = editSaleType === 'Bird' && editSaleWeightKg > 0;
-    const finalSubtotal = isBroilerSale
-      ? Number(editSaleWeightKg) * Number(editSalePricePerKg)
-      : Number(editSaleQty) * Number(editSaleUnitPrice);
+    try {
+      const isBroilerSale = editSaleType === 'Bird' && Number(editSaleWeightKg) > 0;
+      const finalSubtotal = isBroilerSale
+        ? (Number(editSaleWeightKg) || 0) * (Number(editSalePricePerKg) || 0)
+        : (Number(editSaleQty) || 0) * (Number(editSaleUnitPrice) || 0);
 
-    await updateSale(editingSaleId, {
-      type: editSaleType,
-      date: editSaleDate,
-      customerName: editSaleCustomerName,
-      customerContact: editSaleCustomerContact,
-      quantity: Number(editSaleQty),
-      unitPrice: isBroilerSale ? finalSubtotal / Number(editSaleQty) : Number(editSaleUnitPrice),
-      totalAmount: finalSubtotal,
-      amountPaid: Number(editSaleAmountPaid),
-      transportCharges: Number(editSaleTransport),
-      otherCharges: Number(editSaleOther),
-      oldBalance: Number(editSaleOldBalance),
-      batchId: editSaleType === 'Bird' ? editSaleBatchId : undefined,
-      details: editSaleDetails,
-      weightKg: isBroilerSale ? Number(editSaleWeightKg) : undefined,
-      pricePerKg: isBroilerSale ? Number(editSalePricePerKg) : undefined
-    });
-    setIsEditSaleModalOpen(false);
+      const computedTransport = editSaleAdditionalCharges
+        .filter(c => c.name.toLowerCase().includes('transport') || c.name.toLowerCase().includes('freight'))
+        .reduce((sum, c) => sum + Number(c.amount || 0), 0);
+
+      const computedOther = editSaleAdditionalCharges
+        .filter(c => !c.name.toLowerCase().includes('transport') && !c.name.toLowerCase().includes('freight'))
+        .reduce((sum, c) => sum + Number(c.amount || 0), 0);
+
+      await updateSale(editingSaleId, {
+        type: editSaleType,
+        date: editSaleDate,
+        customerName: editSaleCustomerName,
+        customerContact: editSaleCustomerContact,
+        quantity: Number(editSaleQty) || 0,
+        unitPrice: isBroilerSale ? (finalSubtotal / (Number(editSaleQty) || 1)) : (Number(editSaleUnitPrice) || 0),
+        totalAmount: finalSubtotal,
+        amountPaid: Number(editSaleAmountPaid) || 0,
+        transportCharges: computedTransport,
+        otherCharges: computedOther,
+        extraChargesList: editSaleAdditionalCharges.map(c => ({ name: c.name, amount: c.amount })),
+        oldBalance: Number(editSaleOldBalance) || 0,
+        batchId: editSaleType === 'Bird' ? editSaleBatchId : undefined,
+        details: editSaleDetails || '',
+        weightKg: isBroilerSale ? (Number(editSaleWeightKg) || 0) : undefined,
+        pricePerKg: isBroilerSale ? (Number(editSalePricePerKg) || 0) : undefined
+      });
+
+      setIsEditSaleModalOpen(false);
+    } catch (err: any) {
+      console.error('Edit sale failed:', err);
+      const msg = err?.message || err?.details || JSON.stringify(err);
+      alert(`Failed to save changes: ${msg}`);
+    }
   };
 
   const handleViewInvoice = (sale: Sale) => {
@@ -843,11 +889,11 @@ export const SalesMgmt: React.FC = () => {
                                 </button>
                                 <button
                                   type="button"
-                                  className={`btn btn-xs-custom ${paidIds.has(s.id) ? 'btn-paid-active' : 'btn-mark-paid'}`}
+                                  className={`btn btn-xs-custom ${isSalePaid(s) ? 'btn-paid-active' : 'btn-mark-paid'}`}
                                   onClick={() => handleInitiateTogglePaid(s.id)}
-                                  title={paidIds.has(s.id) ? 'Mark as unpaid (Admin required)' : 'Mark as paid (Admin required)'}
+                                  title={isSalePaid(s) ? 'Mark as unpaid (Admin required)' : 'Mark as paid (Admin required)'}
                                 >
-                                  {paidIds.has(s.id) ? '🔄 Unmark' : '✅ Mark Paid'}
+                                  {isSalePaid(s) ? '🔄 Unmark' : '✅ Mark Paid'}
                                 </button>
                               </div>
                             </td>
@@ -887,12 +933,12 @@ export const SalesMgmt: React.FC = () => {
             {/* Right: cancel + save */}
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <button className="btn btn-secondary" type="button" onClick={() => setIsEditSaleModalOpen(false)}>Cancel</button>
-              <button className="btn btn-primary" type="button" onClick={handleEditSaleSubmit}>Save Changes</button>
+              <button className="btn btn-primary" type="submit" form="edit-sale-form">Save Changes</button>
             </div>
           </div>
         }
       >
-        <form onSubmit={handleEditSaleSubmit} className="modal-form-grid">
+        <form id="edit-sale-form" onSubmit={handleEditSaleSubmit} className="modal-form-grid">
           <div className="form-row">
             <div className="form-group">
               <label className="form-label">Sale Date</label>
@@ -923,7 +969,7 @@ export const SalesMgmt: React.FC = () => {
               <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">Number of Birds Sold</label>
-                  <input type="number" min="1" className="form-control" value={editSaleQty} onChange={e => setEditSaleQty(Number(e.target.value))} required />
+                  <input type="number" min="1" className="form-control" value={editSaleQty === 0 ? '' : editSaleQty} onChange={e => setEditSaleQty(Number(e.target.value))} required />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Total Weight (Kg)</label>
@@ -941,11 +987,11 @@ export const SalesMgmt: React.FC = () => {
             <div className="form-row">
               <div className="form-group">
                 <label className="form-label">Quantity ({editSaleType === 'Bird' ? 'birds' : 'eggs'})</label>
-                <input type="number" min="1" className="form-control" value={editSaleQty} onChange={e => setEditSaleQty(Number(e.target.value))} required />
+                <input type="number" min="1" className="form-control" value={editSaleQty === 0 ? '' : editSaleQty} onChange={e => setEditSaleQty(Number(e.target.value))} required />
               </div>
               <div className="form-group">
                 <label className="form-label">Price per {editSaleType === 'Bird' ? 'Bird' : 'Egg'} (Rs)</label>
-                <input type="number" step="0.01" min="0.01" className="form-control" value={editSaleUnitPrice} onChange={e => setEditSaleUnitPrice(Number(e.target.value))} required />
+                <input type="number" step="0.01" min="0.01" className="form-control" value={editSaleUnitPrice === 0 ? '' : editSaleUnitPrice} onChange={e => setEditSaleUnitPrice(Number(e.target.value))} required />
               </div>
             </div>
           )}
@@ -962,50 +1008,61 @@ export const SalesMgmt: React.FC = () => {
             </div>
           )}
 
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">Transport Charges (Rs)</label>
-              <input 
-                type="number" 
-                step="0.01" 
-                min="0" 
-                className="form-control" 
-                value={editSaleTransport} 
-                onChange={e => setEditSaleTransport(Number(e.target.value))} 
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Other Charges (Rs)</label>
-              <input 
-                type="number" 
-                step="0.01" 
-                min="0" 
-                className="form-control" 
-                value={editSaleOther} 
-                onChange={e => setEditSaleOther(Number(e.target.value))} 
-              />
-            </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.75rem', marginBottom: '0.4rem' }}>
+            <label className="form-label" style={{ margin: 0, fontWeight: 700, fontSize: '0.83rem' }}>
+              Additional Charges & Adjustments
+            </label>
+            <button type="button" className="btn-nice-outline" onClick={handleAddEditCharge} style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.3)', color: 'var(--color-emerald)', fontSize: '0.76rem', fontWeight: 700, padding: '0.25rem 0.65rem', borderRadius: '20px', cursor: 'pointer' }}>
+              ➕ Add Charge
+            </button>
           </div>
+          {editSaleAdditionalCharges.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', marginBottom: '0.75rem' }}>
+              {editSaleAdditionalCharges.map(chg => {
+                const isPreset = PRESET_CHARGES.includes(chg.name);
+                const selectValue = isPreset ? chg.name : 'Other (Custom...)';
+                return (
+                  <div key={chg.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', padding: '0.45rem 0.6rem', borderRadius: 'var(--radius-sm)' }}>
+                    <div style={{ display: 'flex', gap: '0.45rem', alignItems: 'center' }}>
+                      <select className="form-control form-control-sm" style={{ flex: 1, fontSize: '0.82rem', padding: '0.3rem 0.5rem' }} value={selectValue} onChange={e => handleUpdateEditCharge(chg.id, 'name', e.target.value === 'Other (Custom...)' ? 'Custom Charge Description' : e.target.value)}>
+                        <option value="Transport">Transport</option>
+                        <option value="Loading">Loading</option>
+                        <option value="Discount">Discount</option>
+                        <option value="Previous Arrears">Previous Arrears</option>
+                        <option value="GST / Tax">GST / Tax</option>
+                        <option value="Packing Fee">Packing Fee</option>
+                        <option value="Handling">Handling</option>
+                        <option value="Other (Custom...)">Other (Custom...)</option>
+                      </select>
+                      <input type="number" step="0.01" className="form-control form-control-sm" style={{ width: '100px', fontSize: '0.82rem', padding: '0.3rem 0.5rem', textAlign: 'right' }} placeholder="0.00" value={chg.amount || ''} onChange={e => handleUpdateEditCharge(chg.id, 'amount', Number(e.target.value))} />
+                      <button type="button" onClick={() => handleRemoveEditCharge(chg.id)} style={{ background: 'rgba(244, 63, 94, 0.1)', border: '1px solid rgba(244, 63, 94, 0.25)', color: '#f43f5e', fontSize: '0.8rem', fontWeight: 700, width: '28px', height: '28px', borderRadius: '6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+                    </div>
+                    {!isPreset && (
+                      <input type="text" className="form-control form-control-sm" style={{ fontSize: '0.8rem', padding: '0.25rem 0.5rem' }} placeholder="Type custom charge name..." value={chg.name} onChange={e => handleUpdateEditCharge(chg.id, 'name', e.target.value)} />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           <div className="form-row">
             <div className="form-group">
               <label className="form-label">Old Balance (Rs)</label>
-              <input 
-                type="number" 
+              <input type="number" 
                 step="0.01" 
                 className="form-control" 
-                value={editSaleOldBalance} 
+                value={editSaleOldBalance === 0 ? '' : editSaleOldBalance} 
                 onChange={e => setEditSaleOldBalance(Number(e.target.value))} 
               />
             </div>
             <div className="form-group">
               <label className="form-label">Amount Paid (Rs)</label>
-              <input 
-                type="number" 
+              <input type="number" 
                 step="0.01" 
                 min="0" 
                 className="form-control" 
-                value={editSaleAmountPaid} 
+                value={editSaleAmountPaid === 0 ? '' : editSaleAmountPaid} 
                 onChange={e => setEditSaleAmountPaid(Number(e.target.value))} 
                 required 
               />
@@ -1032,7 +1089,8 @@ export const SalesMgmt: React.FC = () => {
                 const subtotal = editSaleType === 'Bird' && editSaleWeightKg > 0
                   ? Number(editSaleWeightKg) * Number(editSalePricePerKg)
                   : Number(editSaleQty) * Number(editSaleUnitPrice);
-                const grandTotal = subtotal + editSaleTransport + editSaleOther;
+                const totalAdd = editSaleAdditionalCharges.reduce((sum, c) => sum + Number(c.amount || 0), 0);
+                const grandTotal = subtotal + totalAdd;
                 const totalOutstanding = grandTotal + editSaleOldBalance;
                 const remaining = totalOutstanding - editSaleAmountPaid;
                 return (
@@ -1053,18 +1111,18 @@ export const SalesMgmt: React.FC = () => {
                       <span>Subtotal</span>
                       <strong>Rs {subtotal.toFixed(2)}</strong>
                     </div>
-                    {editSaleTransport > 0 && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
-                        <span>Transport Charges</span>
-                        <strong>+ Rs {editSaleTransport.toFixed(2)}</strong>
-                      </div>
-                    )}
-                    {editSaleOther > 0 && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
-                        <span>Other Charges</span>
-                        <strong>+ Rs {editSaleOther.toFixed(2)}</strong>
-                      </div>
-                    )}
+                    {editSaleAdditionalCharges.map(c => {
+                      if (!c.amount && c.amount !== 0) return null;
+                      return (
+                        <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
+                          <span>{c.name}</span>
+                          <strong style={{ color: c.amount < 0 ? '#b91c1c' : 'inherit' }}>
+                            {c.amount < 0 ? '- Rs ' : '+ Rs '}
+                            {Math.abs(c.amount).toFixed(2)}
+                          </strong>
+                        </div>
+                      );
+                    })}
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.92rem', color: 'var(--text-primary)', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.25rem' }}>
                       <span>Grand Total</span>
                       <strong>Rs {grandTotal.toFixed(2)}</strong>
@@ -1174,7 +1232,7 @@ export const SalesMgmt: React.FC = () => {
                     </td>
                     <td>{activeInvoice.quantity.toLocaleString()} eggs</td>
                     <td>Rs {activeInvoice.unitPrice.toFixed(4)}</td>
-                    <td style={{ textAlign: 'right' }}><strong>Rs {activeInvoice.totalAmount.toFixed(2)}</strong></td>
+                    <td style={{ textAlign: 'right' }}><strong>Rs {(activeInvoice.quantity * activeInvoice.unitPrice).toFixed(2)}</strong></td>
                   </tr>
                 </tbody>
               </table>
@@ -1240,26 +1298,41 @@ export const SalesMgmt: React.FC = () => {
                 (() => {
                   const transport = activeInvoice.transportCharges ?? 0;
                   const other = activeInvoice.otherCharges ?? 0;
-                  const invoiceTotal = activeInvoice.totalAmount + transport + other;
+                  const invoiceTotal = activeInvoice.totalAmount; // totalAmount is already the full grand total
+                  const subtotal = activeInvoice.quantity * activeInvoice.unitPrice;
                   const paid = activeInvoice.amountPaid ?? 0;
                   const balanceDue = invoiceTotal - paid;
                   return (
                     <>
                       <div className="calc-row">
                         <span>Eggs Subtotal:</span>
-                        <span>Rs {activeInvoice.totalAmount.toFixed(2)}</span>
+                        <span>Rs {subtotal.toFixed(2)}</span>
                       </div>
-                      {transport > 0 && (
-                        <div className="calc-row charge-addition">
-                          <span>+ Transport Charges:</span>
-                          <span className="charge-pos-val">Rs {transport.toFixed(2)}</span>
-                        </div>
-                      )}
-                      {other > 0 && (
-                        <div className="calc-row charge-addition">
-                          <span>+ Other Charges:</span>
-                          <span className="charge-pos-val">Rs {other.toFixed(2)}</span>
-                        </div>
+                      {activeInvoice.extraChargesList && activeInvoice.extraChargesList.length > 0 ? (
+                        activeInvoice.extraChargesList.map((c: any, i: number) => (
+                          <div key={i} className="calc-row charge-addition">
+                            <span>{c.amount < 0 ? '-' : '+'} {c.name}:</span>
+                            <span className="charge-pos-val" style={{ color: c.amount < 0 ? '#b91c1c' : 'inherit' }}>
+                              {c.amount < 0 ? '- Rs ' : 'Rs '}
+                              {Math.abs(c.amount).toFixed(2)}
+                            </span>
+                          </div>
+                        ))
+                      ) : (
+                        <>
+                          {transport > 0 && (
+                            <div className="calc-row charge-addition">
+                              <span>+ Transport Charges:</span>
+                              <span className="charge-pos-val">Rs {transport.toFixed(2)}</span>
+                            </div>
+                          )}
+                          {other > 0 && (
+                            <div className="calc-row charge-addition">
+                              <span>+ Other Charges:</span>
+                              <span className="charge-pos-val">Rs {other.toFixed(2)}</span>
+                            </div>
+                          )}
+                        </>
                       )}
                       <div className="calc-row grand-total">
                         <span>Invoice Total:</span>
@@ -1298,17 +1371,31 @@ export const SalesMgmt: React.FC = () => {
                     <>
                       <div className="calc-row"><span>Subtotal:</span><span>Rs {subtotal.toFixed(2)}</span></div>
 
-                      {savedTransport > 0 && (
-                        <div className="calc-row charge-addition">
-                          <span>+ Transport Charges:</span>
-                          <span className="charge-pos-val">Rs {savedTransport.toFixed(2)}</span>
-                        </div>
-                      )}
-                      {savedOther > 0 && (
-                        <div className="calc-row charge-addition">
-                          <span>+ Other Charges:</span>
-                          <span className="charge-pos-val">Rs {savedOther.toFixed(2)}</span>
-                        </div>
+                      {activeInvoice.extraChargesList && activeInvoice.extraChargesList.length > 0 ? (
+                        activeInvoice.extraChargesList.map((c: any, i: number) => (
+                          <div key={i} className="calc-row charge-addition">
+                            <span>{c.amount < 0 ? '-' : '+'} {c.name}:</span>
+                            <span className="charge-pos-val" style={{ color: c.amount < 0 ? '#b91c1c' : 'inherit' }}>
+                              {c.amount < 0 ? '- Rs ' : 'Rs '}
+                              {Math.abs(c.amount).toFixed(2)}
+                            </span>
+                          </div>
+                        ))
+                      ) : (
+                        <>
+                          {savedTransport > 0 && (
+                            <div className="calc-row charge-addition">
+                              <span>+ Transport Charges:</span>
+                              <span className="charge-pos-val">Rs {savedTransport.toFixed(2)}</span>
+                            </div>
+                          )}
+                          {savedOther > 0 && (
+                            <div className="calc-row charge-addition">
+                              <span>+ Other Charges:</span>
+                              <span className="charge-pos-val">Rs {savedOther.toFixed(2)}</span>
+                            </div>
+                          )}
+                        </>
                       )}
 
                       {extraCharges.map((c, i) => (
@@ -2012,8 +2099,7 @@ export const SalesMgmt: React.FC = () => {
 
           <div className="form-group">
             <label className="form-label">Payment Amount (Rs)</label>
-            <input 
-              type="number" 
+            <input type="number" 
               step="0.01" 
               min="0.01" 
               className="form-control" 

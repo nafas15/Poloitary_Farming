@@ -210,7 +210,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
           <path d="M12 18v-6" />
           <path d="m9 15 3 3 3-3" />
         </svg>
-      )
+      ),
+      adminOnly: true
     }
   ];
 

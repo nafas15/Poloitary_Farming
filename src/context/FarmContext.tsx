@@ -93,6 +93,7 @@ export interface Sale {
   amountPaid?: number;
   transportCharges?: number;
   otherCharges?: number;
+  extraChargesList?: {name: string, amount: number}[];
   oldBalance?: number;
   updatedAt?: string;
 }
@@ -413,12 +414,13 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
       })));
 
       // Map Egg Collections
-      setEggCollections((eggCollectionsData || []).map((e: any) => ({
+      const mappedEggCols = (eggCollectionsData || []).map((e: any) => ({
         date: e.date,
-        collectedQty: e.collected_qty,
-        damagedQty: e.damaged_qty,
-        netQty: e.net_qty
-      })));
+        collectedQty: e.collectedQty || e.collected_qty,
+        damagedQty: e.damagedQty || e.damaged_qty,
+        netQty: e.netQty || e.net_qty
+      }));
+      setEggCollections(mappedEggCols.sort((a: EggCollection, b: EggCollection) => new Date(b.date).getTime() - new Date(a.date).getTime()));
 
       // Map Sales
       const localPayments = (() => {
@@ -448,6 +450,7 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
         let transport = 0;
         let other = 0;
         let oldBal = 0;
+        let extraList = [];
         let displayDetails = s.details || '';
         let updatedAt = s.id;
 
@@ -457,6 +460,7 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
             transport = Number(parsed.transport || 0);
             other = Number(parsed.other || 0);
             oldBal = Number(parsed.oldBalance || 0);
+            extraList = parsed.extraList || [];
             displayDetails = parsed.remarks || '';
             updatedAt = parsed.updatedAt || s.id;
           } catch {}
@@ -479,6 +483,7 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
           amountPaid: amtPaid,
           transportCharges: transport,
           otherCharges: other,
+          extraChargesList: extraList,
           oldBalance: oldBal,
           updatedAt: updatedAt
         };
@@ -864,7 +869,10 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const { error: saleErr } = await supabase.from('sales').insert(newSale);
         if (saleErr) {
-          if (saleErr.code === '42703' || saleErr.message?.includes('amount_paid')) {
+          let currentErr = saleErr;
+
+          // 1st Fallback: amount_paid
+          if (currentErr.code === '42703' || currentErr.message?.includes('amount_paid')) {
             console.warn("Supabase schema missing amount_paid column. Saving to localStorage and retrying insert.");
             
             const localPayments = JSON.parse(localStorage.getItem('aksha_invoice_payments') || '{}');
@@ -881,38 +889,48 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
             delete newSale.amount_paid;
             
-            if (saleErr.message?.includes('weight_kg')) {
-              delete newSale.weight_kg;
-              delete newSale.price_per_kg;
-              newSale.total_amount = quantity * pricePerBird;
-            }
-
             const { error: retryErr } = await supabase.from('sales').insert(newSale);
-            if (retryErr) throw retryErr;
-          } else if (saleErr.code === 'PGRST204' || saleErr.message?.includes('weight_kg') || saleErr.message?.includes('schema cache')) {
+            if (retryErr) currentErr = retryErr;
+            else currentErr = null as any;
+          }
+
+          // 2nd Fallback: weight_kg / price_per_kg
+          if (currentErr && (currentErr.code === 'PGRST204' || currentErr.message?.includes('weight_kg') || currentErr.message?.includes('schema cache') || currentErr.message?.includes('price_per_kg'))) {
             console.warn("Supabase schema cache missing weight_kg columns. Retrying without weight columns.");
-            alert("Notice: Weight-based columns (weight_kg, price_per_kg) do not exist in your Supabase sales table. The sale will be saved as a standard bird sale. Please run the SQL migration at the bottom of schema.sql.");
             
             delete newSale.weight_kg;
             delete newSale.price_per_kg;
             newSale.total_amount = quantity * pricePerBird;
             
-            const { error: retryErr } = await supabase.from('sales').insert(newSale);
-            if (retryErr) throw retryErr;
-          } else {
-            throw saleErr;
+            const { error: retryErr2 } = await supabase.from('sales').insert(newSale);
+            if (retryErr2) throw retryErr2;
+          } else if (currentErr) {
+            throw currentErr;
           }
         }
 
-        await supabase
+        const { error: batchErr } = await supabase
           .from('batches')
           .update({ current_quantity: newCurrentQty, status: newStatus })
           .eq('id', batchId);
+        
+        if (batchErr) throw batchErr;
 
       } catch (err: any) {
         console.error('Failed to save sale:', err);
         alert(`Error completing sale: ${err.message || err}`);
       }
+
+      setBatches(prev => prev.map(b => {
+        if (b.id === batchId) {
+          return {
+            ...b,
+            currentQuantity: newCurrentQty,
+            status: newStatus
+          };
+        }
+        return b;
+      }));
 
       fetchAllData();
     } catch (err) {
@@ -941,16 +959,31 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
         reason
       };
 
-      await Promise.all([
+      const [batchRes, mortRes] = await Promise.all([
         supabase
           .from('batches')
           .update({ current_quantity: newCurrentQty })
           .eq('id', batchId),
         supabase.from('mortality_logs').insert(newLog)
       ]);
+
+      if (batchRes.error) throw batchRes.error;
+      if (mortRes.error) throw mortRes.error;
+      setBatches(prev => prev.map(b => {
+        if (b.id === batchId) {
+          return {
+            ...b,
+            currentQuantity: newCurrentQty,
+            mortalityLogs: [...(b.mortalityLogs || []), newLog]
+          };
+        }
+        return b;
+      }));
+
       fetchAllData();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to log mortality:', err);
+      alert(`Error logging mortality: ${err.message || err}`);
     }
   };
 
@@ -1170,38 +1203,75 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // 4. Egg Production
   const addEggCollection = async (collection: EggCollection) => {
+    const existing = eggCollections.find(c => c.date === collection.date);
+    
+    let finalCollected = collection.collectedQty;
+    let finalDamaged = collection.damagedQty;
+    let finalNet = collection.netQty;
+
+    if (existing) {
+      finalCollected += existing.collectedQty;
+      finalDamaged += existing.damagedQty;
+      finalNet += existing.netQty;
+    }
+
     const newCollection = {
       date: collection.date,
-      collected_qty: collection.collectedQty,
-      damaged_qty: collection.damagedQty,
-      net_qty: collection.netQty
+      collected_qty: finalCollected,
+      damaged_qty: finalDamaged,
+      net_qty: finalNet
     };
-    await supabase.from('egg_collections').upsert(newCollection);
+    
+    const { error } = await supabase.from('egg_collections').upsert(newCollection);
+    
+    if (!error) {
+      const finalEggCollection: EggCollection = {
+        date: collection.date,
+        collectedQty: finalCollected,
+        damagedQty: finalDamaged,
+        netQty: finalNet
+      };
+
+      setEggCollections(prev => {
+        if (existing) {
+          return prev.map(c => c.date === collection.date ? finalEggCollection : c);
+        } else {
+          const newList = [finalEggCollection, ...prev];
+          return newList.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        }
+      });
+    } else {
+      console.error('Failed to add egg collection:', error);
+    }
   };
 
   const deleteEggCollection = async (date: string) => {
     try {
-      await supabase.from('egg_collections').delete().eq('date', date);
+      const { error } = await supabase.from('egg_collections').delete().eq('date', date);
+      if (!error) {
+        setEggCollections(prev => prev.filter(c => c.date !== date));
+      }
     } catch (err) {
       console.error('Failed to delete egg collection:', err);
     }
   };
 
-  const addEggSale = async (sale: Omit<Sale, 'id' | 'invoiceId' | 'type' | 'batchId'>) => {
+  const addEggSale = async (saleData: Omit<Sale, 'id' | 'invoiceId' | 'type' | 'batchId'>) => {
     const saleId = `s-${Date.now()}`;
     const invoiceNum = `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
     
-    const subtotal = sale.totalAmount;
-    const transportAmt = sale.transportCharges || 0;
-    const otherAmt = sale.otherCharges || 0;
+    const subtotal = saleData.totalAmount;
+    const transportAmt = saleData.transportCharges || 0;
+    const otherAmt = saleData.otherCharges || 0;
     const computedTotal = subtotal + transportAmt + otherAmt;
-    const finalPaid = sale.amountPaid ?? computedTotal;
+    const finalPaid = saleData.amountPaid ?? computedTotal;
 
     const detailsPayload = JSON.stringify({
-      remarks: sale.details || `Egg Sale: ${sale.quantity} eggs`,
+      remarks: saleData.details || '',
       transport: transportAmt,
       other: otherAmt,
-      oldBalance: sale.oldBalance || 0,
+      oldBalance: saleData.oldBalance || 0,
+      extraList: saleData.extraChargesList || [],
       updatedAt: new Date().toISOString()
     });
 
@@ -1209,11 +1279,11 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
       id: saleId,
       invoice_id: invoiceNum,
       type: 'Egg',
-      date: sale.date,
-      customer_name: sale.customerName,
-      customer_contact: sale.customerContact,
-      quantity: sale.quantity,
-      unit_price: sale.unitPrice,
+      date: saleData.date,
+      customer_name: saleData.customerName,
+      customer_contact: saleData.customerContact,
+      quantity: saleData.quantity,
+      unit_price: saleData.unitPrice,
       total_amount: computedTotal,
       amount_paid: finalPaid,
       details: detailsPayload
@@ -1523,12 +1593,20 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (originalDate !== updated.date) {
         await supabase.from('egg_collections').delete().eq('date', originalDate);
       }
-      await supabase.from('egg_collections').upsert({
+      const { error } = await supabase.from('egg_collections').upsert({
         date: updated.date,
         collected_qty: updated.collectedQty,
         damaged_qty: updated.damagedQty,
         net_qty: updated.netQty
       });
+      if (!error) {
+        setEggCollections(prev => {
+          let newList = prev.filter(c => c.date !== originalDate);
+          newList = newList.filter(c => c.date !== updated.date);
+          newList.push(updated);
+          return newList.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        });
+      }
     } catch (err) {
       console.error('Failed to update egg collection:', err);
     }
@@ -1552,6 +1630,7 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
         transport: transportAmt,
         other: otherAmt,
         oldBalance: updated.oldBalance || 0,
+        extraList: updated.extraChargesList || [],
         updatedAt: new Date().toISOString()
       });
 
@@ -1572,9 +1651,14 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const performSalesUpdate = async () => {
         try {
+          console.log('[updateSale] Sending to Supabase:', saleId, updatedSale);
           const { error: updateErr } = await supabase.from('sales').update(updatedSale).eq('id', saleId);
+          console.log('[updateSale] Supabase response error:', updateErr);
           if (updateErr) {
-            if (updateErr.code === '42703' || updateErr.message?.includes('amount_paid')) {
+            let currentErr = updateErr;
+            
+            // Handle amount_paid missing
+            if (currentErr.code === '42703' || currentErr.message?.includes('amount_paid')) {
               console.warn("Supabase schema missing amount_paid column. Saving to localStorage and retrying.");
               
               const localPayments = JSON.parse(localStorage.getItem('aksha_invoice_payments') || '{}');
@@ -1592,9 +1676,21 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
               delete updatedSale.amount_paid;
               const { error: retryErr } = await supabase.from('sales').update(updatedSale).eq('id', saleId);
-              if (retryErr) throw retryErr;
-            } else {
-              throw updateErr;
+              if (retryErr) currentErr = retryErr;
+              else currentErr = null as any;
+            }
+
+            // Handle weight_kg / price_per_kg missing
+            if (currentErr && (currentErr.code === 'PGRST204' || currentErr.message?.includes('weight_kg') || currentErr.message?.includes('schema cache') || currentErr.message?.includes('price_per_kg'))) {
+              console.warn("Supabase schema cache missing weight_kg/price_per_kg columns. Retrying without weight columns.");
+              delete updatedSale.weight_kg;
+              delete updatedSale.price_per_kg;
+              updatedSale.total_amount = updated.quantity * updated.unitPrice;
+              
+              const { error: retryErr2 } = await supabase.from('sales').update(updatedSale).eq('id', saleId);
+              if (retryErr2) throw retryErr2;
+            } else if (currentErr) {
+              throw currentErr;
             }
           }
         } catch (err) {
@@ -1676,8 +1772,33 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       await Promise.all(operations);
+
+      // Optimistic local state update — keeps UI in sync without a full page refresh
+      setSales(prev => prev.map(s => {
+        if (s.id !== saleId) return s;
+        return {
+          ...s,
+          type: updated.type,
+          date: updated.date,
+          customerName: updated.customerName,
+          customerContact: updated.customerContact,
+          quantity: updated.quantity,
+          unitPrice: updated.unitPrice,
+          totalAmount: computedTotal,   // full total = subtotal + transport + other (matches DB)
+          amountPaid: finalPaid,
+          transportCharges: transportAmt,
+          otherCharges: otherAmt,
+          extraChargesList: updated.extraChargesList || [],
+          oldBalance: updated.oldBalance || 0,
+          details: updated.details || '',
+          batchId: updated.batchId,
+          weightKg: updated.weightKg,
+          pricePerKg: updated.pricePerKg
+        };
+      }));
     } catch (err) {
       console.error('Failed to update sale:', err);
+      throw err; // re-throw so callers can show user-facing errors
     }
   };
 

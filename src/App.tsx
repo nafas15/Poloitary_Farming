@@ -66,7 +66,7 @@ function MainAppContent() {
       case 'health':       return <HealthMgmt />;
       case 'eggs':         return <EggProduction />;
       case 'sales':        return isAdmin ? <SalesMgmt /> : <Dashboard />;
-      case 'invoices':     return <InvoiceGenerator />;
+      case 'invoices':     return isAdmin ? <InvoiceGenerator /> : <Dashboard />;
       case 'expenses':     return isAdmin ? <ExpenseMgmt /> : <Dashboard />;
       case 'profit-loss':  return isAdmin ? <ProfitLoss /> : <Dashboard />;
       case 'reports':      return isAdmin ? <Reports /> : <Dashboard />;

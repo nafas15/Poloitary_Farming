@@ -16,10 +16,8 @@ interface AdditionalChargeItem {
 }
 
 const FARM_NAME = 'Aksha Poultry Farms & Traders';
-const FARM_ADDRESS = '123 Farm Road, Sector 4, Tamil Nadu';
-const FARM_PHONE = '+91 98765 43210';
-const FARM_EMAIL = 'billing@akshapoultry.com';
-const FARM_GST = '33AAAAA0000A1Z5';
+const FARM_ADDRESS = '423/1, Kekunagolla, Kekunagolla';
+const FARM_PHONE = '+94768470361';
 
 const PRESET_CHARGES = [
   'Transport / Freight',
@@ -33,8 +31,8 @@ const PRESET_CHARGES = [
 
 export const InvoiceGenerator: React.FC = () => {
   // Customer Details
-  const [customerName, setCustomerName] = useState('Sunny Bakehouses & Supermarket');
-  const [customerContact, setCustomerContact] = useState('+91 91234 56789');
+  const [customerName, setCustomerName] = useState('');
+  const [customerContact, setCustomerContact] = useState('');
 
   // Invoice Meta
   const [invoiceNumber, setInvoiceNumber] = useState(() => `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`);
@@ -42,19 +40,19 @@ export const InvoiceGenerator: React.FC = () => {
 
   // Line Items
   const [items, setItems] = useState<InvoiceLineItem[]>([
-    { id: 'item-1', description: 'Fresh Broiler Birds (Live Weight)', unit: 'Kg', quantity: 250, rate: 120 },
-    { id: 'item-2', description: 'Fresh Grade-A Table Eggs', unit: 'Trays (30 Eggs)', quantity: 20, rate: 180 }
+    { id: 'item-1', description: '', unit: '', quantity: 0, rate: 0 },
+    { id: 'item-2', description: '', unit: '', quantity: 0, rate: 0 }
   ]);
 
   // Dynamic Additional Charges / Adjustments List
   const [additionalCharges, setAdditionalCharges] = useState<AdditionalChargeItem[]>([
-    { id: 'chg-1', name: 'Transport / Freight', amount: 0, type: 'add' }
+    { id: 'chg-1', name: '', amount: 0, type: 'add' }
   ]);
 
   // Billing & Payment Details
   const [amountPaid, setAmountPaid] = useState<number>(0);
   const [isAmountPaidCustom, setIsAmountPaidCustom] = useState(false);
-  const [paymentMode, setPaymentMode] = useState<string>('Cash');
+  const [paymentMode, setPaymentMode] = useState<string>('');
 
   // Line item handlers
   const handleAddItem = () => {
@@ -62,10 +60,10 @@ export const InvoiceGenerator: React.FC = () => {
       ...prev,
       {
         id: `item-${Date.now()}`,
-        description: 'New Poultry Item Description',
-        unit: 'Kg',
-        quantity: 10,
-        rate: 100
+        description: '',
+        unit: '',
+        quantity: 0,
+        rate: 0
       }
     ]);
   };
@@ -90,8 +88,8 @@ export const InvoiceGenerator: React.FC = () => {
       ...prev,
       {
         id: `chg-${Date.now()}`,
-        name: 'Transport / Freight',
-        amount: 100,
+        name: '',
+        amount: 0,
         type: 'add'
       }
     ]);
@@ -110,13 +108,13 @@ export const InvoiceGenerator: React.FC = () => {
   const handleResetBlank = () => {
     setInvoiceNumber(`INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`);
     setInvoiceDate(new Date().toISOString().split('T')[0]);
-    setCustomerName('New Customer');
+    setCustomerName('');
     setCustomerContact('');
     setItems([
-      { id: `item-${Date.now()}`, description: 'Poultry Item Description', unit: 'Kg', quantity: 100, rate: 100 }
+      { id: `item-${Date.now()}`, description: '', unit: '', quantity: 0, rate: 0 }
     ]);
     setAdditionalCharges([
-      { id: `chg-${Date.now()}`, name: 'Transport / Freight', amount: 0, type: 'add' }
+      { id: `chg-${Date.now()}`, name: '', amount: 0, type: 'add' }
     ]);
     setAmountPaid(0);
     setIsAmountPaidCustom(false);
@@ -186,7 +184,7 @@ export const InvoiceGenerator: React.FC = () => {
           <div className="form-row-compact">
             <div className="form-group">
               <label className="form-label-xs">Customer Name</label>
-              <input type="text" className="form-control form-control-sm" value={customerName} onChange={e => setCustomerName(e.target.value)} required />
+              <input type="text" className="form-control form-control-sm" value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="Sunny Bakehouses & Supermarket" required />
             </div>
             <div className="form-group">
               <label className="form-label-xs">Customer Contact</label>
@@ -227,7 +225,7 @@ export const InvoiceGenerator: React.FC = () => {
                     type="text"
                     className="form-control form-control-sm"
                     style={{ flex: 1 }}
-                    placeholder="Description (e.g. Broiler Birds, Layer Eggs)"
+                    placeholder="Fresh Broiler Birds (Live Weight)"
                     value={item.description}
                     onChange={e => handleUpdateItem(item.id, 'description', e.target.value)}
                   />
@@ -257,8 +255,9 @@ export const InvoiceGenerator: React.FC = () => {
                       type="number"
                       min="0"
                       step="any"
+                      placeholder="e.g. 100"
                       className="form-control form-control-sm"
-                      value={item.quantity}
+                      value={item.quantity === 0 ? '' : item.quantity}
                       onChange={e => handleUpdateItem(item.id, 'quantity', Number(e.target.value))}
                     />
                   </div>
@@ -268,8 +267,9 @@ export const InvoiceGenerator: React.FC = () => {
                       type="number"
                       min="0"
                       step="any"
+                      placeholder="e.g. 120"
                       className="form-control form-control-sm"
-                      value={item.rate}
+                      value={item.rate === 0 ? '' : item.rate}
                       onChange={e => handleUpdateItem(item.id, 'rate', Number(e.target.value))}
                     />
                   </div>
@@ -278,7 +278,8 @@ export const InvoiceGenerator: React.FC = () => {
                     <input
                       type="text"
                       className="form-control form-control-sm"
-                      value={(Number(item.quantity || 0) * Number(item.rate || 0)).toFixed(2)}
+                      placeholder="0.00"
+                      value={(Number(item.quantity || 0) * Number(item.rate || 0)) === 0 ? '' : (Number(item.quantity || 0) * Number(item.rate || 0)).toFixed(2)}
                       disabled
                       style={{ background: 'rgba(255,255,255,0.05)', fontWeight: 700 }}
                     />
@@ -292,7 +293,7 @@ export const InvoiceGenerator: React.FC = () => {
 
           {/* Dynamic Additional Charges & Payments Section */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-            <div className="section-title-sm" style={{ margin: 0 }}>💰 Additional Charges & Adjustments</div>
+            <div className="section-title-sm" style={{ margin: 0 }}>Additional Charges & Adjustments</div>
             <button type="button" className="btn-nice-outline" onClick={handleAddCharge}>
               ➕ Add Charge
             </button>
@@ -301,7 +302,7 @@ export const InvoiceGenerator: React.FC = () => {
           <div className="line-items-form-list" style={{ marginBottom: '1rem' }}>
             {additionalCharges.map(chg => {
               const isPreset = PRESET_CHARGES.includes(chg.name);
-              const selectValue = isPreset ? chg.name : 'Other (Custom...)';
+              const selectValue = chg.name === '' ? '' : (isPreset ? chg.name : 'Other (Custom...)');
 
               return (
                 <div key={chg.id} className="line-item-form-card">
@@ -309,7 +310,7 @@ export const InvoiceGenerator: React.FC = () => {
                     <select
                       className="form-control form-control-sm charge-input-name"
                       style={{ fontWeight: 600 }}
-                      value={selectValue}
+                      value={selectValue || ''}
                       onChange={e => {
                         const val = e.target.value;
                         if (val === 'Other (Custom...)') {
@@ -319,14 +320,15 @@ export const InvoiceGenerator: React.FC = () => {
                         }
                       }}
                     >
-                      <option value="Transport / Freight">🚚 Transport / Freight</option>
-                      <option value="Labor / Loading Charges">👷 Labor / Loading Charges</option>
-                      <option value="Discount / Concession">🏷️ Discount / Concession</option>
-                      <option value="Previous Arrears / Balance">📜 Previous Arrears / Balance</option>
-                      <option value="GST / Tax Charges">📜 GST / Tax Charges</option>
-                      <option value="Packing & Crate Fee">📦 Packing & Crate Fee</option>
-                      <option value="Handling / Maintenance">🛠️ Handling / Maintenance</option>
-                      <option value="Other (Custom...)">✍️ Other (Custom...)</option>
+                      <option value="" disabled hidden>Select charge type...</option>
+                      <option value="Transport / Freight">Transport / Freight</option>
+                      <option value="Labor / Loading Charges">Labor / Loading Charges</option>
+                      <option value="Discount / Concession">Discount / Concession</option>
+                      <option value="Previous Arrears / Balance">Previous Arrears / Balance</option>
+                      <option value="GST / Tax Charges">GST / Tax Charges</option>
+                      <option value="Packing & Crate Fee">Packing & Crate Fee</option>
+                      <option value="Handling / Maintenance">Handling / Maintenance</option>
+                      <option value="Other (Custom...)">Other (Custom...)</option>
                     </select>
 
                     <select
@@ -358,7 +360,7 @@ export const InvoiceGenerator: React.FC = () => {
                     </button>
                   </div>
 
-                  {!isPreset && (
+                  {!isPreset && chg.name !== '' && (
                     <input
                       type="text"
                       className="form-control form-control-sm"
@@ -381,7 +383,8 @@ export const InvoiceGenerator: React.FC = () => {
                 step="0.01"
                 min="0"
                 className="form-control form-control-sm"
-                value={effectiveAmountPaid}
+                placeholder="0.00"
+                value={effectiveAmountPaid === 0 ? '' : effectiveAmountPaid}
                 onChange={e => {
                   setAmountPaid(Number(e.target.value));
                   setIsAmountPaidCustom(true);
@@ -392,7 +395,7 @@ export const InvoiceGenerator: React.FC = () => {
               <label className="form-label-xs">Payment Method / Transaction Type</label>
               <select
                 className="form-control form-control-sm"
-                value={['Cash', 'UPI / GPay / PhonePe', 'Bank Transfer (NEFT/RTGS)', 'Cheque Deposit', 'Credit / On Account', 'Partially Paid in Cash & UPI', 'Advance Payment Received', 'Direct Sales Cash'].includes(paymentMode) ? paymentMode : 'Other'}
+                value={paymentMode === '' ? '' : (['Cash', 'UPI / GPay / PhonePe', 'Bank Transfer (NEFT/RTGS)', 'Cheque Deposit', 'Credit / On Account', 'Partially Paid in Cash & UPI', 'Advance Payment Received', 'Direct Sales Cash'].includes(paymentMode) ? paymentMode : 'Other')}
                 onChange={e => {
                   const val = e.target.value;
                   if (val === 'Other') {
@@ -402,18 +405,19 @@ export const InvoiceGenerator: React.FC = () => {
                   }
                 }}
               >
-                <option value="Cash">💵 Cash</option>
-                <option value="UPI / GPay / PhonePe">📱 UPI / GPay / PhonePe</option>
-                <option value="Bank Transfer (NEFT/RTGS)">🏦 Bank Transfer (NEFT/RTGS)</option>
-                <option value="Cheque Deposit">📑 Cheque Deposit</option>
-                <option value="Credit / On Account">📜 Credit / On Account</option>
-                <option value="Partially Paid in Cash & UPI">🔀 Partially Paid in Cash & UPI</option>
-                <option value="Advance Payment Received">💳 Advance Payment Received</option>
-                <option value="Direct Sales Cash">🏪 Direct Sales Cash</option>
-                <option value="Other">✍️ Other (Custom...)</option>
+                <option value="" disabled hidden>Select Payment Method...</option>
+                <option value="Cash">Cash</option>
+                <option value="UPI / GPay / PhonePe">UPI / GPay / PhonePe</option>
+                <option value="Bank Transfer (NEFT/RTGS)">Bank Transfer (NEFT/RTGS)</option>
+                <option value="Cheque Deposit">Cheque Deposit</option>
+                <option value="Credit / On Account">Credit / On Account</option>
+                <option value="Partially Paid in Cash & UPI">Partially Paid in Cash & UPI</option>
+                <option value="Advance Payment Received">Advance Payment Received</option>
+                <option value="Direct Sales Cash">Direct Sales Cash</option>
+                <option value="Other">Other (Custom...)</option>
               </select>
 
-              {!['Cash', 'UPI / GPay / PhonePe', 'Bank Transfer (NEFT/RTGS)', 'Cheque Deposit', 'Credit / On Account', 'Partially Paid in Cash & UPI', 'Advance Payment Received', 'Direct Sales Cash'].includes(paymentMode) && (
+              {!['', 'Cash', 'UPI / GPay / PhonePe', 'Bank Transfer (NEFT/RTGS)', 'Cheque Deposit', 'Credit / On Account', 'Partially Paid in Cash & UPI', 'Advance Payment Received', 'Direct Sales Cash'].includes(paymentMode) && (
                 <input
                   type="text"
                   className="form-control form-control-sm"
@@ -439,8 +443,6 @@ export const InvoiceGenerator: React.FC = () => {
                   <p className="inv-farm-sub">{FARM_ADDRESS}</p>
                   <p className="inv-farm-contact">
                     <span>📞 {FARM_PHONE}</span>
-                    <span> | ✉️ {FARM_EMAIL}</span>
-                    <span> | 📜 GST: {FARM_GST}</span>
                   </p>
                 </div>
               </div>
@@ -460,15 +462,7 @@ export const InvoiceGenerator: React.FC = () => {
                 {customerContact && <p className="inv-cust-detail">📞 {customerContact}</p>}
               </div>
 
-              <div className="inv-cust-box inv-status-box">
-                <span className="inv-box-label">Payment Status:</span>
-                <div className={`inv-status-stamp ${paymentStatus.toLowerCase()}`}>
-                  {paymentStatus === 'PAID' ? '✅ FULLY PAID' : paymentStatus === 'PARTIAL' ? '⚠️ PARTIAL PAYMENT' : '❌ UNPAID DUE'}
-                </div>
-                <div className="inv-cust-detail" style={{ marginTop: '0.4rem' }}>
-                  <span>Mode:</span> <strong>{paymentMode}</strong>
-                </div>
-              </div>
+
             </div>
 
             {/* Line Items Table */}
@@ -830,7 +824,7 @@ export const InvoiceGenerator: React.FC = () => {
 
         .inv-doc-customer-bar {
           display: grid;
-          grid-template-columns: 1fr 220px;
+          grid-template-columns: 1fr;
           gap: 1rem;
           background: #f8fafc;
           border: 1px solid #e2e8f0;
@@ -1003,6 +997,12 @@ export const InvoiceGenerator: React.FC = () => {
           @page {
             size: A4 portrait;
             margin: 8mm;
+          }
+
+          html, body {
+            background: #ffffff !important;
+            background-color: #ffffff !important;
+            color: #000000 !important;
           }
 
           body * {

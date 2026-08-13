@@ -4,7 +4,8 @@ import type { FeedType } from '../context/FarmContext';
 import { Modal } from '../components/Modal';
 
 export const FeedMgmt: React.FC = () => {
-  const { batches, feedPurchases, feedConsumption, addFeedPurchase, addFeedConsumption, getFeedStock, updateFeedPurchase, updateFeedConsumption, deleteFeedPurchase } = useFarm();
+  const { batches, feedPurchases, feedConsumption, addFeedPurchase, addFeedConsumption, getFeedStock, updateFeedPurchase, updateFeedConsumption, deleteFeedPurchase, currentUser } = useFarm();
+  const isAdmin = currentUser?.role === 'Admin';
 
   const [subTab, setSubTab] = useState<'inventory' | 'purchases' | 'consumption'>('inventory');
   const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
@@ -14,8 +15,8 @@ export const FeedMgmt: React.FC = () => {
   const [isEditPurchaseModalOpen, setIsEditPurchaseModalOpen] = useState(false);
   const [editingPurchaseId, setEditingPurchaseId] = useState('');
   const [editPurchaseType, setEditPurchaseType] = useState<FeedType>('Starter');
-  const [editPurchaseQty, setEditPurchaseQty] = useState<number>(500);
-  const [editPurchaseCost, setEditPurchaseCost] = useState<number>(250);
+  const [editPurchaseQty, setEditPurchaseQty] = useState<number>(0);
+  const [editPurchaseCost, setEditPurchaseCost] = useState<number>(0);
   const [editPurchaseVendor, setEditPurchaseVendor] = useState('');
   const [editPurchaseDate, setEditPurchaseDate] = useState('');
 
@@ -52,7 +53,7 @@ export const FeedMgmt: React.FC = () => {
   const [editingConsumptionId, setEditingConsumptionId] = useState('');
   const [editConsumptionType, setEditConsumptionType] = useState<FeedType>('Starter');
   const [editConsumptionBatchId, setEditConsumptionBatchId] = useState('');
-  const [editConsumptionQty, setEditConsumptionQty] = useState<number>(50);
+  const [editConsumptionQty, setEditConsumptionQty] = useState<number>(0);
   const [editConsumptionDate, setEditConsumptionDate] = useState('');
 
   const handleOpenEditConsumption = (fc: any) => {
@@ -77,14 +78,14 @@ export const FeedMgmt: React.FC = () => {
   };
 
   const [purchaseType, setPurchaseType] = useState<FeedType>('Starter');
-  const [purchaseQty, setPurchaseQty] = useState<number>(500);
-  const [purchaseCost, setPurchaseCost] = useState<number>(250);
+  const [purchaseQty, setPurchaseQty] = useState<number>(0);
+  const [purchaseCost, setPurchaseCost] = useState<number>(0);
   const [purchaseVendor, setPurchaseVendor] = useState('');
   const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().split('T')[0]);
 
   const [consumptionType, setConsumptionType] = useState<FeedType>('Starter');
   const [consumptionBatchId, setConsumptionBatchId] = useState('');
-  const [consumptionQty, setConsumptionQty] = useState<number>(50);
+  const [consumptionQty, setConsumptionQty] = useState<number>(0);
   const [consumptionDate, setConsumptionDate] = useState(new Date().toISOString().split('T')[0]);
 
   const handlePurchaseSubmit = (e: React.FormEvent) => {
@@ -98,8 +99,8 @@ export const FeedMgmt: React.FC = () => {
       vendor: purchaseVendor
     });
     setPurchaseVendor('');
-    setPurchaseQty(500);
-    setPurchaseCost(250);
+    setPurchaseQty(0);
+    setPurchaseCost(0);
     setIsPurchaseModalOpen(false);
   };
 
@@ -113,7 +114,7 @@ export const FeedMgmt: React.FC = () => {
       quantityKg: Number(consumptionQty)
     });
     setConsumptionBatchId('');
-    setConsumptionQty(50);
+    setConsumptionQty(0);
     setIsConsumptionModalOpen(false);
   };
 
@@ -183,9 +184,11 @@ export const FeedMgmt: React.FC = () => {
           <button className={`tab-btn ${subTab === 'inventory' ? 'active' : ''}`} onClick={() => setSubTab('inventory')}>
             📊 Inventory Levels
           </button>
-          <button className={`tab-btn ${subTab === 'purchases' ? 'active' : ''}`} onClick={() => setSubTab('purchases')}>
-            🛒 Feed Purchases
-          </button>
+          {isAdmin && (
+            <button className={`tab-btn ${subTab === 'purchases' ? 'active' : ''}`} onClick={() => setSubTab('purchases')}>
+              🛒 Feed Purchases
+            </button>
+          )}
           <button className={`tab-btn ${subTab === 'consumption' ? 'active' : ''}`} onClick={() => setSubTab('consumption')}>
             🍽️ Daily Consumption
           </button>
@@ -195,9 +198,11 @@ export const FeedMgmt: React.FC = () => {
           <button className="btn btn-secondary" onClick={() => setIsConsumptionModalOpen(true)}>
             📝 Log Consumption
           </button>
-          <button className="btn btn-primary" onClick={() => setIsPurchaseModalOpen(true)}>
-            ➕ Record Purchase
-          </button>
+          {isAdmin && (
+            <button className="btn btn-primary" onClick={() => setIsPurchaseModalOpen(true)}>
+              ➕ Record Purchase
+            </button>
+          )}
         </div>
       </div>
 
@@ -258,7 +263,7 @@ export const FeedMgmt: React.FC = () => {
       )}
 
       {/* ── Purchases Tab ── */}
-      {subTab === 'purchases' && (
+      {isAdmin && subTab === 'purchases' && (
         <div className="glass-card">
           <div className="card-header-row">
             <div>
@@ -423,11 +428,11 @@ export const FeedMgmt: React.FC = () => {
           <div className="fm-form-row">
             <div className="form-group">
               <label className="form-label">Quantity (kg)</label>
-              <input type="number" min="1" className="form-control" value={purchaseQty} onChange={e => setPurchaseQty(Number(e.target.value))} required />
+              <input placeholder="500" type="number" min="1" className="form-control" value={purchaseQty === 0 ? '' : purchaseQty} onChange={e => setPurchaseQty(Number(e.target.value))} required />
             </div>
             <div className="form-group">
               <label className="form-label">Total Cost (Rs)</label>
-              <input type="number" step="0.01" className="form-control" value={purchaseCost} onChange={e => setPurchaseCost(Number(e.target.value))} required />
+              <input placeholder="250" type="number" step="0.01" className="form-control" value={purchaseCost === 0 ? '' : purchaseCost} onChange={e => setPurchaseCost(Number(e.target.value))} required />
             </div>
           </div>
           <div className="form-group">
@@ -482,7 +487,7 @@ export const FeedMgmt: React.FC = () => {
             </div>
             <div className="form-group">
               <label className="form-label">Quantity Consumed (kg)</label>
-              <input type="number" min="0.1" step="0.1" className="form-control" value={consumptionQty} onChange={e => setConsumptionQty(Number(e.target.value))} required />
+              <input placeholder="50" type="number" min="0.1" step="0.1" className="form-control" value={consumptionQty === 0 ? '' : consumptionQty} onChange={e => setConsumptionQty(Number(e.target.value))} required />
             </div>
           </div>
           {consumptionType && (
@@ -524,11 +529,11 @@ export const FeedMgmt: React.FC = () => {
           <div className="fm-form-row">
             <div className="form-group">
               <label className="form-label">Quantity (kg)</label>
-              <input type="number" min="1" className="form-control" value={editPurchaseQty} onChange={e => setEditPurchaseQty(Number(e.target.value))} required />
+              <input placeholder="500" type="number" min="1" className="form-control" value={editPurchaseQty === 0 ? '' : editPurchaseQty} onChange={e => setEditPurchaseQty(Number(e.target.value))} required />
             </div>
             <div className="form-group">
               <label className="form-label">Total Cost (Rs)</label>
-              <input type="number" step="0.01" className="form-control" value={editPurchaseCost} onChange={e => setEditPurchaseCost(Number(e.target.value))} required />
+              <input placeholder="250" type="number" step="0.01" className="form-control" value={editPurchaseCost === 0 ? '' : editPurchaseCost} onChange={e => setEditPurchaseCost(Number(e.target.value))} required />
             </div>
           </div>
           <div className="form-group">
@@ -583,7 +588,7 @@ export const FeedMgmt: React.FC = () => {
             </div>
             <div className="form-group">
               <label className="form-label">Quantity Consumed (kg)</label>
-              <input type="number" min="0.1" step="0.1" className="form-control" value={editConsumptionQty} onChange={e => setEditConsumptionQty(Number(e.target.value))} required />
+              <input placeholder="50" type="number" min="0.1" step="0.1" className="form-control" value={editConsumptionQty === 0 ? '' : editConsumptionQty} onChange={e => setEditConsumptionQty(Number(e.target.value))} required />
             </div>
           </div>
           {editConsumptionType && (

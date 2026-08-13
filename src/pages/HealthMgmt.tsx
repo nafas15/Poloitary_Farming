@@ -128,7 +128,7 @@ export const HealthMgmt: React.FC = () => {
   const [disease, setDisease] = useState('');
   const [medicine, setMedicine] = useState('');
   const [dosage, setDosage] = useState('');
-  const [medicalCost, setMedicalCost] = useState<number>(100);
+  const [medicalCost, setMedicalCost] = useState<number>(0);
 
   const handleVaccineSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -147,7 +147,7 @@ export const HealthMgmt: React.FC = () => {
     setDisease('');
     setMedicine('');
     setDosage('');
-    setMedicalCost(100);
+    setMedicalCost(0);
     setIsMedicalModalOpen(false);
   };
 
@@ -606,12 +606,11 @@ export const HealthMgmt: React.FC = () => {
             </div>
             <div className="form-group">
               <label className="form-label">Treatment Cost (Rs)</label>
-              <input
-                type="number"
+              <input placeholder="100" type="number"
                 step="0.01"
                 min="0"
                 className="form-control"
-                value={medicalCost}
+                value={medicalCost === 0 ? '' : medicalCost}
                 onChange={e => setMedicalCost(Number(e.target.value))}
                 required
               />
@@ -769,12 +768,11 @@ export const HealthMgmt: React.FC = () => {
             </div>
             <div className="form-group">
               <label className="form-label">Treatment Cost (Rs)</label>
-              <input
-                type="number"
+              <input type="number"
                 step="0.01"
                 min="0"
                 className="form-control"
-                value={editMedicalCost}
+                value={editMedicalCost === 0 ? '' : editMedicalCost}
                 onChange={e => setEditMedicalCost(Number(e.target.value))}
                 required
               />
@@ -847,11 +845,10 @@ export const HealthMgmt: React.FC = () => {
             </div>
             <div className="form-group">
               <label className="form-label">Quantity Lost (Birds)</label>
-              <input
-                type="number"
+              <input type="number"
                 min="1"
                 className="form-control"
-                value={editMortalityNewQty}
+                value={editMortalityNewQty === 0 ? '' : editMortalityNewQty}
                 onChange={e => setEditMortalityNewQty(Number(e.target.value))}
                 required
               />

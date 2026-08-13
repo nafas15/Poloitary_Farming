@@ -441,6 +441,12 @@ tr:hover td {
 }
 
 @media print {
+  html, body {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #000000 !important;
+  }
+
   /* Hide EVERYTHING by default */
   body * {
     visibility: hidden !important;

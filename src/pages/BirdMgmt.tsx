@@ -13,8 +13,10 @@ export const BirdMgmt: React.FC = () => {
     deleteBatch,
     sellBatch,
     sales,
-    updateBatch
+    updateBatch,
+    currentUser
   } = useFarm();
+  const isAdmin = currentUser?.role === 'Admin';
 
   // Tab Filter ('All' | 'Broiler' | 'Layer' | 'Archived' | 'MortalityAudit')
   const [filter, setFilter] = useState<'All' | 'Broiler' | 'Layer' | 'Archived' | 'MortalityAudit'>('All');
@@ -31,10 +33,10 @@ export const BirdMgmt: React.FC = () => {
   const [newBatchId, setNewBatchId] = useState('');
   const [newType, setNewType] = useState<BirdType>('Broiler');
   const [newArrivalDate, setNewArrivalDate] = useState(new Date().toISOString().split('T')[0]);
-  const [newQty, setNewQty] = useState<number>(1000);
-  const [newPrice, setNewPrice] = useState<number>(1.20);
-  const [newQtyKg, setNewQtyKg] = useState<number>(1500);
-  const [newPricePerKg, setNewPricePerKg] = useState<number>(90);
+  const [newQty, setNewQty] = useState<number>(0);
+  const [newPrice, setNewPrice] = useState<number>(0);
+  const [newQtyKg, setNewQtyKg] = useState<number>(0);
+  const [newPricePerKg, setNewPricePerKg] = useState<number>(0);
 
   // Form Fields - Edit Batch
   const [editingBatchId, setEditingBatchId] = useState('');
@@ -123,7 +125,7 @@ export const BirdMgmt: React.FC = () => {
 
   // Form Fields - Sell Batch
   const [sellBatchId, setSellBatchId] = useState('');
-  const [sellQty, setSellQty] = useState<number>(100);
+  const [sellQty, setSellQty] = useState<number>(0);
   const [sellUnitPrice, setSellUnitPrice] = useState<number>(0);
   const [sellWeightKg, setSellWeightKg] = useState<number>(0);
   const [sellPricePerKg, setSellPricePerKg] = useState<number>(0);
@@ -140,7 +142,7 @@ export const BirdMgmt: React.FC = () => {
   const handleAddCharge = () => {
     setAdditionalCharges(prev => [
       ...prev,
-      { id: `chg-${Date.now()}`, name: 'Transport', amount: 0 }
+      { id: `chg-${Date.now()}`, name: '', amount: 0 }
     ]);
   };
 
@@ -155,7 +157,7 @@ export const BirdMgmt: React.FC = () => {
   };
 
   // Form Fields - Log Mortality
-  const [mortalityQty, setMortalityQty] = useState<number>(1);
+  const [mortalityQty, setMortalityQty] = useState<number>(0);
   const [mortalityReason, setMortalityReason] = useState('');
   const [mortalityDate, setMortalityDate] = useState(new Date().toISOString().split('T')[0]);
 
@@ -188,10 +190,10 @@ export const BirdMgmt: React.FC = () => {
 
     // Reset and Close
     setNewBatchId('');
-    setNewQty(1000);
-    setNewPrice(1.20);
-    setNewQtyKg(1500);
-    setNewPricePerKg(90);
+    setNewQty(0);
+    setNewPrice(0);
+    setNewQtyKg(0);
+    setNewPricePerKg(0);
     setIsAddModalOpen(false);
   };
 
@@ -205,7 +207,7 @@ export const BirdMgmt: React.FC = () => {
     logMortality(selectedBatchId, Number(mortalityQty), mortalityReason, mortalityDate);
 
     // Reset and Close
-    setMortalityQty(1);
+    setMortalityQty(0);
     setMortalityReason('');
     setIsMortalityModalOpen(false);
   };
@@ -345,22 +347,24 @@ export const BirdMgmt: React.FC = () => {
         </div>
 
         <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button
-            className="btn btn-secondary"
-            onClick={() => {
-              setSellBatchId('');
-              setSellQty(100);
-              setSellUnitPrice(0);
-              setSellWeightKg(0);
-              setSellPricePerKg(0);
-              setSellCustomer('');
-              setSellContact('');
-              setAdditionalCharges([]);
-              setIsSellModalOpen(true);
-            }}
-          >
-            🐔 Sell Bird Batch
-          </button>
+          {isAdmin && (
+            <button
+              className="btn btn-secondary"
+              onClick={() => {
+                setSellBatchId('');
+                setSellQty(0);
+                setSellUnitPrice(0);
+                setSellWeightKg(0);
+                setSellPricePerKg(0);
+                setSellCustomer('');
+                setSellContact('');
+                setAdditionalCharges([]);
+                setIsSellModalOpen(true);
+              }}
+            >
+              🐔 Sell Bird Batch
+            </button>
+          )}
           <button
             className="btn btn-primary"
             onClick={() => {
@@ -438,7 +442,7 @@ export const BirdMgmt: React.FC = () => {
                               style={{ color: 'var(--color-emerald)', borderColor: 'rgba(16, 185, 129, 0.3)' }}
                               onClick={() => {
                                 setSellBatchId(batch.id);
-                                setSellQty(100);
+                                setSellQty(0);
                                 setSellUnitPrice(0);
                                 setSellWeightKg(0);
                                 setSellPricePerKg(0);
@@ -668,11 +672,10 @@ export const BirdMgmt: React.FC = () => {
             </div>
             <div className="form-group">
               <label className="form-label">Quantity Arrived</label>
-              <input
-                type="number"
+              <input placeholder="1000" type="number"
                 min="1"
                 className="form-control"
-                value={newQty}
+                value={newQty === 0 ? '' : newQty}
                 onChange={e => setNewQty(Number(e.target.value))}
                 required
               />
@@ -683,24 +686,22 @@ export const BirdMgmt: React.FC = () => {
             <div className="form-row">
               <div className="form-group">
                 <label className="form-label">Quantity Arrived in Kg</label>
-                <input
-                  type="number"
+                <input placeholder="1000" type="number"
                   step="0.01"
                   min="0.01"
                   className="form-control"
-                  value={newQtyKg}
+                  value={newQtyKg === 0 ? '' : newQtyKg}
                   onChange={e => setNewQtyKg(Number(e.target.value))}
                   required
                 />
               </div>
               <div className="form-group">
                 <label className="form-label">Purchase Price per Kg (Rs)</label>
-                <input
-                  type="number"
+                <input placeholder="1.2" type="number"
                   step="0.01"
                   min="0.01"
                   className="form-control"
-                  value={newPricePerKg}
+                  value={newPricePerKg === 0 ? '' : newPricePerKg}
                   onChange={e => setNewPricePerKg(Number(e.target.value))}
                   required
                 />
@@ -709,12 +710,11 @@ export const BirdMgmt: React.FC = () => {
           ) : (
             <div className="form-group">
               <label className="form-label">Purchase Price per Bird (Rs)</label>
-              <input
-                type="number"
+              <input placeholder="1.2" type="number"
                 step="0.01"
                 min="0.01"
                 className="form-control"
-                value={newPrice}
+                value={newPrice === 0 ? '' : newPrice}
                 onChange={e => setNewPrice(Number(e.target.value))}
                 required
               />
@@ -785,11 +785,10 @@ export const BirdMgmt: React.FC = () => {
             </div>
             <div className="form-group">
               <label className="form-label">Initial Quantity</label>
-              <input
-                type="number"
+              <input type="number"
                 min="1"
                 className="form-control"
-                value={editInitialQty}
+                value={editInitialQty === 0 ? '' : editInitialQty}
                 onChange={e => setEditInitialQty(Number(e.target.value))}
                 required
               />
@@ -800,24 +799,22 @@ export const BirdMgmt: React.FC = () => {
             <div className="form-row">
               <div className="form-group">
                 <label className="form-label">Quantity Arrived in Kg</label>
-                <input
-                  type="number"
+                <input type="number"
                   step="0.01"
                   min="0.01"
                   className="form-control"
-                  value={editQtyKg}
+                  value={editQtyKg === 0 ? '' : editQtyKg}
                   onChange={e => setEditQtyKg(Number(e.target.value))}
                   required
                 />
               </div>
               <div className="form-group">
                 <label className="form-label">Purchase Price per Kg (Rs)</label>
-                <input
-                  type="number"
+                <input type="number"
                   step="0.01"
                   min="0.01"
                   className="form-control"
-                  value={editPricePerKg}
+                  value={editPricePerKg === 0 ? '' : editPricePerKg}
                   onChange={e => setEditPricePerKg(Number(e.target.value))}
                   required
                 />
@@ -826,12 +823,11 @@ export const BirdMgmt: React.FC = () => {
           ) : (
             <div className="form-group">
               <label className="form-label">Purchase Price per Bird (Rs)</label>
-              <input
-                type="number"
+              <input type="number"
                 step="0.01"
                 min="0.01"
                 className="form-control"
-                value={editPrice}
+                value={editPrice === 0 ? '' : editPrice}
                 onChange={e => setEditPrice(Number(e.target.value))}
                 required
               />
@@ -881,12 +877,11 @@ export const BirdMgmt: React.FC = () => {
               <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">Number of Birds to Sell</label>
-                  <input
-                    type="number"
+                  <input placeholder="100" type="number"
                     min="1"
                     max={selectedSellBatch?.currentQuantity ?? undefined}
                     className="form-control"
-                    value={sellQty}
+                    value={sellQty === 0 ? '' : sellQty}
                     onChange={e => setSellQty(Number(e.target.value))}
                     required
                   />
@@ -898,12 +893,11 @@ export const BirdMgmt: React.FC = () => {
                 </div>
                 <div className="form-group">
                   <label className="form-label">Total Weight sold (Kg)</label>
-                  <input
-                    type="number"
+                  <input type="number"
                     step="0.01"
                     min="0.01"
                     className="form-control"
-                    value={sellWeightKg || ''}
+                    value={sellWeightKg === 0 ? '' : sellWeightKg}
                     onChange={e => setSellWeightKg(Number(e.target.value))}
                     placeholder="e.g. 150.5"
                     required
@@ -913,12 +907,11 @@ export const BirdMgmt: React.FC = () => {
               <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">Price per Kg (Rs)</label>
-                  <input
-                    type="number"
+                  <input type="number"
                     step="0.01"
                     min="0.01"
                     className="form-control"
-                    value={sellPricePerKg || ''}
+                    value={sellPricePerKg === 0 ? '' : sellPricePerKg}
                     onChange={e => setSellPricePerKg(Number(e.target.value))}
                     placeholder="e.g. 180"
                     required
@@ -930,12 +923,11 @@ export const BirdMgmt: React.FC = () => {
             <div className="form-row">
               <div className="form-group">
                 <label className="form-label">Quantity to Sell</label>
-                <input
-                  type="number"
+                <input placeholder="100" type="number"
                   min="1"
                   max={selectedSellBatch?.currentQuantity ?? undefined}
                   className="form-control"
-                  value={sellQty}
+                  value={sellQty === 0 ? '' : sellQty}
                   onChange={e => setSellQty(Number(e.target.value))}
                   required
                 />
@@ -947,12 +939,11 @@ export const BirdMgmt: React.FC = () => {
               </div>
               <div className="form-group">
                 <label className="form-label">Price per Bird (Rs)</label>
-                <input
-                  type="number"
+                <input type="number"
                   step="0.01"
                   min="0.01"
                   className="form-control"
-                  value={sellUnitPrice}
+                  value={sellUnitPrice === 0 ? '' : sellUnitPrice}
                   onChange={e => setSellUnitPrice(Number(e.target.value))}
                   required
                 />
@@ -1073,8 +1064,7 @@ export const BirdMgmt: React.FC = () => {
                         <option value="Other (Custom...)">Other (Custom...)</option>
                       </select>
 
-                      <input
-                        type="number"
+                      <input type="number"
                         step="0.01"
                         min="0"
                         className="form-control form-control-sm"
@@ -1138,8 +1128,7 @@ export const BirdMgmt: React.FC = () => {
                     <div className="form-row" style={{ marginTop: '0.5rem', marginBottom: '0.5rem' }}>
                       <div className="form-group">
                         <label className="form-label">Amount Paid now (Rs)</label>
-                        <input
-                          type="number"
+                        <input type="number"
                           step="0.01"
                           min="0"
                           className="form-control"
@@ -1272,11 +1261,10 @@ export const BirdMgmt: React.FC = () => {
             </div>
             <div className="form-group">
               <label className="form-label">Quantity Lost</label>
-              <input
-                type="number"
+              <input placeholder="1" type="number"
                 min="1"
                 className="form-control"
-                value={mortalityQty}
+                value={mortalityQty === 0 ? '' : mortalityQty}
                 onChange={e => setMortalityQty(Number(e.target.value))}
                 required
               />
@@ -1347,11 +1335,10 @@ export const BirdMgmt: React.FC = () => {
             </div>
             <div className="form-group">
               <label className="form-label">Quantity Lost (Birds)</label>
-              <input
-                type="number"
+              <input type="number"
                 min="1"
                 className="form-control"
-                value={editMortalityNewQty}
+                value={editMortalityNewQty === 0 ? '' : editMortalityNewQty}
                 onChange={e => setEditMortalityNewQty(Number(e.target.value))}
                 required
               />

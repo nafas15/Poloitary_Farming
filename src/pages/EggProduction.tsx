@@ -19,22 +19,23 @@ const PRESET_CHARGES = [
 ];
 
 export const EggProduction: React.FC = () => {
-  const { eggCollections, addEggCollection, deleteEggCollection, addEggSale, updateEggCollection, sales } = useFarm();
+  const { eggCollections, addEggCollection, deleteEggCollection, addEggSale, updateEggCollection, sales, currentUser } = useFarm();
+  const isAdmin = currentUser?.role === 'Admin';
   
   const [isCollectModalOpen, setIsCollectModalOpen] = useState(false);
   const [isSellModalOpen, setIsSellModalOpen] = useState(false);
 
   // Form Fields - Egg Collection
   const [collectDate, setCollectDate] = useState(new Date().toISOString().split('T')[0]);
-  const [collectQty, setCollectQty] = useState<number>(800);
-  const [collectDamaged, setCollectDamaged] = useState<number>(10);
+  const [collectQty, setCollectQty] = useState<number>(0);
+  const [collectDamaged, setCollectDamaged] = useState<number>(0);
 
   // Edit Collection States
   const [isEditCollectModalOpen, setIsEditCollectModalOpen] = useState(false);
   const [editingCollectionOriginalDate, setEditingCollectionOriginalDate] = useState('');
   const [editCollectDate, setEditCollectDate] = useState('');
-  const [editCollectQty, setEditCollectQty] = useState<number>(800);
-  const [editCollectDamaged, setEditCollectDamaged] = useState<number>(10);
+  const [editCollectQty, setEditCollectQty] = useState<number>(0);
+  const [editCollectDamaged, setEditCollectDamaged] = useState<number>(0);
 
   const handleOpenEditCollect = (c: any) => {
     setEditingCollectionOriginalDate(c.date);
@@ -57,13 +58,13 @@ export const EggProduction: React.FC = () => {
   };
 
   // Form Fields - Sell Eggs
-  const [eggQty, setEggQty] = useState<number>(300);
-  const [eggPricePerEgg, setEggPricePerEgg] = useState<number>(30);
+  const [eggSaleDate, setEggSaleDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [eggQty, setEggQty] = useState<number>(0);
+  const [eggPricePerEgg, setEggPricePerEgg] = useState<number>(0);
   const [eggCustomer, setEggCustomer] = useState('');
   const [eggContact, setEggContact] = useState('');
   const [eggDetails, setEggDetails] = useState('');
   const [eggAmountPaid, setEggAmountPaid] = useState<number>(0);
-  const [isEggAmountPaidCustom, setIsEggAmountPaidCustom] = useState<boolean>(false);
 
   // Dynamic Additional Charges for Egg Sale
   const [additionalCharges, setAdditionalCharges] = useState<SaleAdditionalCharge[]>([]);
@@ -71,7 +72,7 @@ export const EggProduction: React.FC = () => {
   const handleAddCharge = () => {
     setAdditionalCharges(prev => [
       ...prev,
-      { id: `chg-${Date.now()}`, name: 'Transport', amount: 0 }
+      { id: `chg-${Date.now()}`, name: '', amount: 0 }
     ]);
   };
 
@@ -96,8 +97,8 @@ export const EggProduction: React.FC = () => {
     });
 
     // Reset and Close
-    setCollectQty(800);
-    setCollectDamaged(10);
+    setCollectQty(0);
+    setCollectDamaged(0);
     setIsCollectModalOpen(false);
   };
 
@@ -115,28 +116,27 @@ export const EggProduction: React.FC = () => {
       .filter(c => !c.name.toLowerCase().includes('transport') && !c.name.toLowerCase().includes('freight'))
       .reduce((sum, c) => sum + Number(c.amount || 0), 0);
 
-    const computedTotal = subtotal + computedTransport + computedOther;
-    const finalPaid = isEggAmountPaidCustom ? eggAmountPaid : computedTotal;
+
     
     addEggSale({
-      date: new Date().toISOString().split('T')[0],
+      date: eggSaleDate,
       customerName: eggCustomer,
       customerContact: eggContact,
       quantity: eggQty,
       unitPrice: eggPricePerEgg,
       totalAmount: subtotal,
-      amountPaid: finalPaid,
+      amountPaid: eggAmountPaid,
       transportCharges: computedTransport,
       otherCharges: computedOther,
+      extraChargesList: additionalCharges,
       oldBalance: customerOldBalance,
       details: eggDetails || `Egg Sale: ${eggQty} eggs`
     });
     setEggCustomer('');
     setEggContact('');
     setEggDetails('');
-    setEggQty(300);
+    setEggQty(0);
     setEggAmountPaid(0);
-    setIsEggAmountPaidCustom(false);
     setAdditionalCharges([]);
     setIsSellModalOpen(false);
   };
@@ -161,19 +161,21 @@ export const EggProduction: React.FC = () => {
       <div className="page-header-actions">
         <h4 className="section-title">Egg Collection Dashboard</h4>
         <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button type="button" className="btn btn-secondary" onClick={() => {
-            setEggQty(300);
-            setEggPricePerEgg(30);
-            setEggCustomer('');
-            setEggContact('');
-            setEggDetails('');
-            setEggAmountPaid(0);
-            setIsEggAmountPaidCustom(false);
-            setAdditionalCharges([]);
-            setIsSellModalOpen(true);
-          }}>
-            🥚 Sell Eggs
-          </button>
+          {isAdmin && (
+            <button type="button" className="btn btn-secondary" onClick={() => {
+              setEggSaleDate(new Date().toISOString().split('T')[0]);
+              setEggQty(0);
+              setEggPricePerEgg(0);
+              setEggCustomer('');
+              setEggContact('');
+              setEggDetails('');
+              setEggAmountPaid(0);
+              setAdditionalCharges([]);
+              setIsSellModalOpen(true);
+            }}>
+              🥚 Sell Eggs
+            </button>
+          )}
           <button type="button" className="btn btn-primary" onClick={() => setIsCollectModalOpen(true)}>
             🥚 Log Daily Egg Collection
           </button>
@@ -308,22 +310,20 @@ export const EggProduction: React.FC = () => {
           <div className="form-row">
             <div className="form-group">
               <label className="form-label">Total Eggs Collected</label>
-              <input
-                type="number"
+              <input placeholder="800" type="number"
                 min="1"
                 className="form-control"
-                value={collectQty}
+                value={collectQty === 0 ? '' : collectQty}
                 onChange={e => setCollectQty(Number(e.target.value))}
                 required
               />
             </div>
             <div className="form-group">
               <label className="form-label">Damaged Eggs Count</label>
-              <input
-                type="number"
+              <input placeholder="10" type="number"
                 min="0"
                 className="form-control"
-                value={collectDamaged}
+                value={collectDamaged === 0 ? '' : collectDamaged}
                 onChange={e => setCollectDamaged(Number(e.target.value))}
                 required
               />
@@ -373,22 +373,20 @@ export const EggProduction: React.FC = () => {
           <div className="form-row">
             <div className="form-group">
               <label className="form-label">Total Eggs Collected</label>
-              <input
-                type="number"
+              <input placeholder="800" type="number"
                 min="1"
                 className="form-control"
-                value={editCollectQty}
+                value={editCollectQty === 0 ? '' : editCollectQty}
                 onChange={e => setEditCollectQty(Number(e.target.value))}
                 required
               />
             </div>
             <div className="form-group">
               <label className="form-label">Damaged Eggs Count</label>
-              <input
-                type="number"
+              <input placeholder="10" type="number"
                 min="0"
                 className="form-control"
-                value={editCollectDamaged}
+                value={editCollectDamaged === 0 ? '' : editCollectDamaged}
                 onChange={e => setEditCollectDamaged(Number(e.target.value))}
                 required
               />
@@ -410,14 +408,23 @@ export const EggProduction: React.FC = () => {
         }
       >
         <form onSubmit={handleEggSaleSubmit} className="modal-form-grid">
+          <div className="form-group">
+            <label className="form-label">Sale Date</label>
+            <input
+              type="date"
+              className="form-control"
+              value={eggSaleDate}
+              onChange={e => setEggSaleDate(e.target.value)}
+              required
+            />
+          </div>
           <div className="form-row">
             <div className="form-group">
               <label className="form-label">Quantity of eggs</label>
-              <input
-                type="number"
+              <input placeholder="300" type="number"
                 min="1"
                 className="form-control"
-                value={eggQty}
+                value={eggQty === 0 ? '' : eggQty}
                 onChange={e => setEggQty(Number(e.target.value))}
                 onWheel={e => (e.target as HTMLElement).blur()}
                 required
@@ -425,12 +432,11 @@ export const EggProduction: React.FC = () => {
             </div>
             <div className="form-group">
               <label className="form-label">Price per egg (Rs)</label>
-              <input
-                type="number"
+              <input placeholder="30" type="number"
                 step="0.01"
                 min="0.01"
                 className="form-control"
-                value={eggPricePerEgg}
+                value={eggPricePerEgg === 0 ? '' : eggPricePerEgg}
                 onChange={e => setEggPricePerEgg(Number(e.target.value))}
                 onWheel={e => (e.target as HTMLElement).blur()}
                 required
@@ -547,10 +553,8 @@ export const EggProduction: React.FC = () => {
                         <option value="Other (Custom...)">Other (Custom...)</option>
                       </select>
 
-                      <input
-                        type="number"
+                      <input type="number"
                         step="0.01"
-                        min="0"
                         className="form-control form-control-sm"
                         style={{ width: '100px', fontSize: '0.82rem', padding: '0.3rem 0.5rem', textAlign: 'right' }}
                         placeholder="0.00"
@@ -602,25 +606,23 @@ export const EggProduction: React.FC = () => {
             const subtotal = eggQty * eggPricePerEgg || 0;
             const totalAdd = additionalCharges.reduce((sum, c) => sum + Number(c.amount || 0), 0);
             const currentInvoiceTotal = subtotal + totalAdd;
-            const displayAmountPaid = isEggAmountPaidCustom ? eggAmountPaid : currentInvoiceTotal;
+            const displayAmountPaid = eggAmountPaid;
             return (
               <>
                 {eggQty > 0 && eggPricePerEgg > 0 && (
                   <div className="form-row" style={{ marginTop: '0.5rem', marginBottom: '0.5rem' }}>
                     <div className="form-group">
                       <label className="form-label">Amount Paid now (Rs)</label>
-                      <input
-                        type="number"
+                      <input type="number"
                         step="0.01"
                         min="0"
                         className="form-control"
-                        value={isEggAmountPaidCustom ? eggAmountPaid : currentInvoiceTotal || ''}
+                        value={eggAmountPaid || ''}
                         onChange={e => {
-                          setIsEggAmountPaidCustom(true);
                           setEggAmountPaid(Number(e.target.value));
                         }}
                         onWheel={e => (e.target as HTMLElement).blur()}
-                        placeholder="Defaults to full invoice total"
+                        placeholder="0.00"
                         required
                       />
                     </div>
@@ -647,7 +649,7 @@ export const EggProduction: React.FC = () => {
                       <strong>Rs {subtotal.toFixed(2)}</strong>
                     </div>
                     {additionalCharges.map(c => {
-                      if (!c.amount || c.amount <= 0) return null;
+                      if (!c.amount && c.amount !== 0) return null;
                       return (
                         <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
                           <span>{c.name}</span>
